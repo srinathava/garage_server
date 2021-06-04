@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Garage Gate Status</title>
+    
+    <script
+    src="https://code.jquery.com/jquery-3.6.0.min.js"
+    integrity="sha256-/xUj+3OJU5yExlq6GSYGSHk7tPXikynS7ogEvDej/m4="
+    crossorigin="anonymous"></script>
+
+    <script type="module" src="update_status.mjs"></script>
+    <link rel="stylesheet" href="status.css">
+</head>
+<body>
+    <div id="templates">
+        <div class="gate">
+            <button id="OPEN">Open</button>
+            <div id="id">1</div>
+            <button id="CLOSE">Close</button>
+            <br style="clear: both;">
+        </div>
+    </div>
+    <div id="main"></div>
+</body>
+</html>

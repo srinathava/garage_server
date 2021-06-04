@@ -1,0 +1,20 @@
+#id {
+    width: 50px;
+    height: 50px;
+    text-align: center;
+}
+
+#id, #OPEN, #CLOSE {
+    float: left;
+}
+
+.gate {
+    padding: 10px;
+}
+
+.gate.alive #id {
+    background-color: lightgreen;
+}
+.gate.dead #id, .gate.unknown #id {
+    background-color: lightsalmon;
+}
