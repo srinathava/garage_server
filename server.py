@@ -24,6 +24,7 @@ class GateStatus():
         self.alive = False
         self.lastTickTime = datetime.min
         self.gatePosition = '?'
+        self.ipAddress = ''
 
 class MqttClient:
     def __init__(self):
@@ -50,12 +51,14 @@ class MqttClient:
 
     def onHeartbeat(self, msg):
         gateid = msg.topic.rsplit("/", 1)[1]
-        gatePos = msg.payload.decode('utf-8')
+
+        msgJson = json.loads(msg.payload.decode('utf-8'))
 
         status = self.idToStatusMap[gateid]
         status.alive = True
         status.lastTickTime = datetime.now()
-        status.gatePosition = gatePos
+        status.gatePosition = msgJson['gatePos']
+        status.ipAddress = msgJson['ipAddress']
 
     def updateGateStatuses(self):
         print("Updating gate status")
