@@ -1,4 +1,4 @@
-const GATE_IDS = ['5','6','7'];
+const GATE_IDS = ['1', '2', '3', '4', '5','6', '7'];
 
 class UpdateStatus {
     constructor() {
@@ -11,9 +11,10 @@ class UpdateStatus {
             $(gate).data('gate_id', gateid);
             $('#id', gate).text(gateid);
             $('#main').append(gate);
+            $(gate).hide();
 
             this.gateIdMap[gateid] = gate;
-            $('#OPEN, #CLOSE', gate).click((event) => {
+            $('#OPEN, #CLOSE, #MIDDLE, #CALIBRATE', gate).click((event) => {
                 this.sendGateCmd(gateid, event.target.id.toLowerCase());
             });
         }
@@ -38,25 +39,14 @@ class UpdateStatus {
             $(gate).removeClass('alive');
             $(gate).removeClass('dead');
  
-            $('button', gate).prop('disabled', true);
-            
-            if (gstatus === undefined) {
-                $(gate).addClass('unknown');
+            if (gstatus === undefined || !gstatus.alive) {
+                $(gate).hide();
                 continue;
-            } else if (gstatus.alive) {
+            } else {
+                $(gate).show();
                 $(gate).addClass('alive');
-            } else {
-                $(gate).addClass('dead');
-                continue;
-            }
-
-           if (gstatus.gatePosition == 'open') {
-                $('#CLOSE', gate).prop('disabled', false);
-            } else if (gstatus.gatePosition == 'close') {
-                $('#OPEN', gate).prop('disabled', false);
-            } else {
-                // can be middle, in which case we enable both buttons
                 $('button', gate).prop('disabled', false);
+                $('#id', gate).html('' + gateid + '<br>' + gstatus.gatePosition);
             }
 
         }

@@ -15,7 +15,7 @@ scheduler.api_enabled = True
 scheduler.init_app(app)
 scheduler.start()
 
-GATE_IDS = ['5', '6', '7']
+GATE_IDS = ['1', '2', '3', '4', '5', '6', '7']
 GATE_MAX_KEEPALIVE = timedelta(minutes=1)
 
 class GateStatus():
@@ -51,8 +51,13 @@ class MqttClient:
 
     def onHeartbeat(self, msg):
         gateid = msg.topic.rsplit("/", 1)[1]
+        payload = msg.payload.decode('utf-8')
+        print(f"Processing heartbeat message from {gateid}: {payload}")
 
-        msgJson = json.loads(msg.payload.decode('utf-8'))
+        try:
+            msgJson = json.loads(payload)
+        except json.decoder.JSONDecodeError:
+            return
 
         status = self.idToStatusMap[gateid]
         status.alive = True
@@ -72,8 +77,8 @@ class MqttClient:
             self.onHeartbeat(msg)
 
     def gatecmd(self, gateid, gatecmd):
-        print(f"Sending {gatecmd} to gate {gateid}")
-        # self.client.publish("/gatecmd/" + gateid, gatecmd)
+        print(f"Publishing message /gatecmd/{gateid} {gatecmd}")
+        self.client.publish("/gatecmd/" + gateid, gatecmd)
 
 mqtt = MqttClient()
 
@@ -97,13 +102,14 @@ def gate_status():
     return Response(str, mimetype='application/json')
 
 @app.route("/update/<gateid>")
-def update(gateid):
+def update(gateid=''):
+    print("Getting to update")
     md5HeaderName = 'X-Esp8266-Sketch-Md5'
     if not md5HeaderName in request.headers:
         return Response("Only for ESP8266", status=404)
 
-    md5File = f'firmware/firmware-{gateid}.md5'
-    binFile = f'firmware/firmware-{gateid}.bin'
+    md5File = f'firmware/firmware.md5'
+    binFile = f'firmware/firmware.bin'
     if not os.path.exists(md5File):
         return Response("No update found", status=304)
 
