@@ -15,7 +15,7 @@ scheduler.api_enabled = True
 scheduler.init_app(app)
 scheduler.start()
 
-GATE_IDS = ['1', '2', '3', '4', '5', '6', '7']
+GATE_IDS = ['0', '1', '2', '3', '4', '5', '6', '7']
 GATE_MAX_KEEPALIVE = timedelta(minutes=1)
 
 class GateStatus():
@@ -57,6 +57,9 @@ class MqttClient:
         try:
             msgJson = json.loads(payload)
         except json.decoder.JSONDecodeError:
+            return
+
+        if gateid == '0':
             return
 
         status = self.idToStatusMap[gateid]
