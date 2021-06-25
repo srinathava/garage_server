@@ -1,5 +1,5 @@
 credentials*
-.venv
+.venv*
 firmware
 __pycache__
 *.sw?
