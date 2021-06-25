@@ -6,6 +6,7 @@ import paho.mqtt.client as mqtt
 from datetime import datetime, timedelta
 from flask_apscheduler import APScheduler
 import json
+import asyncio
 from json import JSONEncoder
 
 app = Flask(__name__, static_folder="static")
@@ -16,15 +17,23 @@ scheduler.init_app(app)
 scheduler.start()
 
 GATE_IDS = ['0', '1', '2', '3', '4', '5', '6', '7']
+TOOL_SENSOR_IDS = ['tablesaw']
 GATE_MAX_KEEPALIVE = timedelta(minutes=1)
 
-class GateStatus():
+class Status:
     def __init__(self, id):
         self.id = id
         self.alive = False
         self.lastTickTime = datetime.min
-        self.gatePosition = '?'
-        self.ipAddress = ''
+        self.status = '?'
+
+class GateStatus(Status):
+    def __init__(self, id):
+        super().__init__(id)
+
+class ToolSensorStatus(Status):
+    def __init__(self, id):
+        super().__init__(id)
 
 class MqttClient:
     def __init__(self):
@@ -32,7 +41,13 @@ class MqttClient:
         self.client.on_connect = self.on_connect
         self.client.on_message = self.on_message
 
-        self.idToStatusMap = { id: GateStatus(id) for id in GATE_IDS }
+        self.pendingFuture = None
+
+        self.idToStatusMap = {}
+        for id in GATE_IDS:
+            self.idToStatusMap[id] = GateStatus(id)
+        for id in TOOL_SENSOR_IDS:
+            self.idToStatusMap[id] = ToolSensorStatus(id)
 
         self.client.connect("192.168.1.3", 1883, 60)
         self.client.loop_start()
@@ -42,6 +57,9 @@ class MqttClient:
         self.client.subscribe("/gateack/#")
         self.client.subscribe("/gatecmd/#")
         self.client.subscribe("/heartbeat/#")
+        self.client.subscribe("/tool_sensor/#")
+        self.client.subscribe("/wait")
+        self.client.subscribe("/ack")
 
     def gateid(self, topic):
         # All our topics to gates are of the form "/gatecmd/1". 
@@ -52,7 +70,11 @@ class MqttClient:
     def onHeartbeat(self, msg):
         gateid = msg.topic.rsplit("/", 1)[1]
         payload = msg.payload.decode('utf-8')
-        print(f"Processing heartbeat message from {gateid}: {payload}")
+        # print(f"Processing heartbeat message from {gateid}: {payload}")
+
+        status = self.idToStatusMap[gateid]
+        status.alive = True
+        status.lastTickTime = datetime.now()
 
         try:
             msgJson = json.loads(payload)
@@ -62,22 +84,56 @@ class MqttClient:
         if gateid == '0':
             return
 
-        status = self.idToStatusMap[gateid]
-        status.alive = True
-        status.lastTickTime = datetime.now()
-        status.gatePosition = msgJson['gatePos']
-        status.ipAddress = msgJson['ipAddress']
-
-    def updateGateStatuses(self):
-        print("Updating gate status")
+        if gateid in GATE_IDS:
+            status.status = msgJson['gatePos']
+            
+    def updateStatuses(self):
+        # print("Updating gate status")
         now = datetime.now()
         for (gateid, status) in self.idToStatusMap.items():
             if now - status.lastTickTime > GATE_MAX_KEEPALIVE:
                 status.alive = False
 
+    def onToolSensor(self, msg):
+        toolid = msg.topic.rsplit("/", 1)[1]
+        status = self.idToStatusMap[toolid]
+
+        payload = msg.payload.decode('utf-8')
+        status.status = payload
+
+    def switchToTool(self, toolid):
+        gateids = self.gatesForTool[toolid]
+        for gateid in GATE_IDS:
+            gate = self.idToStatusMap[gateid]
+            if not gate.alive:
+                continue
+            if gateid in gateids:
+                self.gatecmd(gateid, "open")
+            else:
+                self.gatecmd(gateid, "close")
+
+    async def wait_for_ack(self):
+        print("Starting wait for ack")
+        self.pendingFuture = asyncio.Future()
+        await self.pendingFuture
+        print("Done with wait")
+
+    def on_ack(self):
+        if self.pendingFuture:
+            print("processing ack")
+            self.pendingFuture.set_result(True)
+
     def on_message(self, client, userdata, msg):
         if msg.topic.startswith("/heartbeat"):
             self.onHeartbeat(msg)
+        elif msg.topic.startswith("/tool_sensor"):
+            self.onToolSensor(msg)
+        elif msg.topic.startswith("/wait"):
+            print("Processing wait")
+            asyncio.run_coroutine_threadsafe(self.wait_for_ack())
+        elif msg.topic.startswith("/ack"):
+            print("Processing ack")
+            self.on_ack()
 
     def gatecmd(self, gateid, gatecmd):
         print(f"Publishing message /gatecmd/{gateid} {gatecmd}")
@@ -86,8 +142,8 @@ class MqttClient:
 mqtt = MqttClient()
 
 @scheduler.task('interval', seconds=10)
-def updateGateStatuses():
-    mqtt.updateGateStatuses()
+def updateStatuses():
+    mqtt.updateStatuses()
 
 @app.route("/")
 def hello_world():

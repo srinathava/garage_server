@@ -8,13 +8,13 @@
     float: left;
 }
 
-.gate {
+.gate, .tool {
     padding: 10px;
 }
 
-.gate.alive #id {
+.alive #id {
     background-color: lightgreen;
 }
-.gate.dead #id, .gate.unknown #id {
+.dead #id, .unknown #id {
     background-color: lightsalmon;
 }
