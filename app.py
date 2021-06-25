@@ -8,6 +8,8 @@ from flask_apscheduler import APScheduler
 import json
 import asyncio
 from json import JSONEncoder
+import time
+import threading
 
 app = Flask(__name__, static_folder="static")
 
@@ -16,9 +18,15 @@ scheduler.api_enabled = True
 scheduler.init_app(app)
 scheduler.start()
 
-GATE_IDS = ['0', '1', '2', '3', '4', '5', '6', '7']
-TOOL_SENSOR_IDS = ['tablesaw']
+GATE_IDS = ['1', '2', '3', '4', '5', '6', '7']
+TOOL_SENSOR_IDS = ['tablesaw', 'jointer', 'bandsaw']
 GATE_MAX_KEEPALIVE = timedelta(minutes=1)
+
+GATES_FOR_TOOLS = {
+    'tablesaw': ['6'],
+    'jointer': ['5', '1'],
+    'bandsaw': ['5']
+}
 
 class Status:
     def __init__(self, id):
@@ -49,8 +57,12 @@ class MqttClient:
         for id in TOOL_SENSOR_IDS:
             self.idToStatusMap[id] = ToolSensorStatus(id)
 
+        self.idToStatusMap['0'] = Status('0')
+
         self.client.connect("192.168.1.3", 1883, 60)
         self.client.loop_start()
+
+        self.loop = asyncio.new_event_loop()
 
     def on_connect(self, client, userdata, flags, rc):
         print("Connected to MQTT broker")
@@ -58,19 +70,16 @@ class MqttClient:
         self.client.subscribe("/gatecmd/#")
         self.client.subscribe("/heartbeat/#")
         self.client.subscribe("/tool_sensor/#")
-        self.client.subscribe("/wait")
-        self.client.subscribe("/ack")
 
     def gateid(self, topic):
-        # All our topics to gates are of the form "/gatecmd/1". 
-        # Hence we split once from the right on / and return the 
-        # second token.
+        # All our topics to gates are of the form "/gatecmd/1". Hence we split
+        # once from the right on / and return the second token.
         return topic.rsplit('/', 1)[1]
 
     def onHeartbeat(self, msg):
         gateid = msg.topic.rsplit("/", 1)[1]
         payload = msg.payload.decode('utf-8')
-        # print(f"Processing heartbeat message from {gateid}: {payload}")
+        print(f"Processing heartbeat message from {gateid}: {payload}")
 
         status = self.idToStatusMap[gateid]
         status.alive = True
@@ -94,15 +103,38 @@ class MqttClient:
             if now - status.lastTickTime > GATE_MAX_KEEPALIVE:
                 status.alive = False
 
-    def onToolSensor(self, msg):
-        toolid = msg.topic.rsplit("/", 1)[1]
-        status = self.idToStatusMap[toolid]
+    def onStatusUpdate(self, msg) -> Status:
+        id = msg.topic.rsplit("/", 1)[1]
+        status = self.idToStatusMap[id]
 
         payload = msg.payload.decode('utf-8')
         status.status = payload
+        return status
+
+    def isSwitchedToTool(self, toolid):
+        gateids = GATES_FOR_TOOLS[toolid]
+
+        for gateid in GATE_IDS:
+            gate = self.idToStatusMap[gateid]
+            if not gate.alive:
+                continue
+
+            shouldOpen = gateid in gateids
+            isOpen = gate.status == "open"
+            isClosed = gate.status == "close"
+
+            if shouldOpen and not isOpen:
+                print(f"{gateid} should be open but its not")
+                return False
+            
+            if not shouldOpen and not isClosed:
+                print(f"{gateid} should be closed but its not")
+                return False
+
+        return True
 
     def switchToTool(self, toolid):
-        gateids = self.gatesForTool[toolid]
+        gateids = GATES_FOR_TOOLS[toolid]
         for gateid in GATE_IDS:
             gate = self.idToStatusMap[gateid]
             if not gate.alive:
@@ -112,28 +144,42 @@ class MqttClient:
             else:
                 self.gatecmd(gateid, "close")
 
-    async def wait_for_ack(self):
-        print("Starting wait for ack")
-        self.pendingFuture = asyncio.Future()
-        await self.pendingFuture
-        print("Done with wait")
+        # Horrible busy loop kind of way of doing it. Unfortunately, it looks 
+        # like incorporating async/await with paho-mqtt is a very non-trivial 
+        # undertaking :( 
+        n = 0
+        while not self.isSwitchedToTool(toolid):
+            time.sleep(0.1)
+            n += 1
+            if n > 20:
+                return
 
-    def on_ack(self):
-        if self.pendingFuture:
-            print("processing ack")
-            self.pendingFuture.set_result(True)
+        print("Telling coordinator to turn on DC")
+        self.client.publish("/coordinator/0", "dc_on")
+
+    def onToolSensor(self, msg):
+        print("Getting tool sensor message")
+        status = self.onStatusUpdate(msg)
+        print(f"Tool {status.id} was switched {status.status}")
+        if status.status == "on":
+            # We need to do this on a separate thread otherwise the MQTT thread
+            # which processes incoming messages is blocked and we do not receive
+            # the /gateack messages
+            t = threading.Thread(target=self.switchToTool, args=(status.id,))
+            t.start()
+        else:
+            print("Telling coordinator to turn off DC")
+            self.client.publish("/coordinator/0", "dc_off")
 
     def on_message(self, client, userdata, msg):
         if msg.topic.startswith("/heartbeat"):
             self.onHeartbeat(msg)
         elif msg.topic.startswith("/tool_sensor"):
             self.onToolSensor(msg)
-        elif msg.topic.startswith("/wait"):
-            print("Processing wait")
-            asyncio.run_coroutine_threadsafe(self.wait_for_ack())
-        elif msg.topic.startswith("/ack"):
-            print("Processing ack")
-            self.on_ack()
+        elif msg.topic.startswith("/gateack"):
+            print("Processing gate acknowledgement")
+            status = self.onStatusUpdate(msg)
+            print(f"Gate {status.id} is {status.status}")
 
     def gatecmd(self, gateid, gatecmd):
         print(f"Publishing message /gatecmd/{gateid} {gatecmd}")
