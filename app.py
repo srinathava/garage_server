@@ -155,6 +155,7 @@ class MqttClient:
                 return
 
         print("Telling coordinator to turn on DC")
+        time.sleep(0.2)
         self.client.publish("/coordinator/0", "dc_on")
 
     def onToolSensor(self, msg):
