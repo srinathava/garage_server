@@ -25,7 +25,7 @@ GATE_MAX_KEEPALIVE = timedelta(minutes=1)
 GATES_FOR_TOOLS = {
     'tablesaw': ['6'],
     'jointer': ['5', '1'],
-    'bandsaw': ['5']
+    'bandsaw': ['5', '4']
 }
 
 class Status:
@@ -70,6 +70,7 @@ class MqttClient:
         self.client.subscribe("/gatecmd/#")
         self.client.subscribe("/heartbeat/#")
         self.client.subscribe("/tool_sensor/#")
+        self.client.subscribe("/coordinator_keypress/#")
 
     def gateid(self, topic):
         # All our topics to gates are of the form "/gatecmd/1". Hence we split
@@ -79,7 +80,7 @@ class MqttClient:
     def onHeartbeat(self, msg):
         gateid = msg.topic.rsplit("/", 1)[1]
         payload = msg.payload.decode('utf-8')
-        print(f"Processing heartbeat message from {gateid}: {payload}")
+        # print(f"Processing heartbeat message from {gateid}: {payload}")
 
         status = self.idToStatusMap[gateid]
         status.alive = True
@@ -172,6 +173,16 @@ class MqttClient:
             print("Telling coordinator to turn off DC")
             self.client.publish("/coordinator/0", "dc_off")
 
+    def onCoordinatorKeyPress(self, msg):
+        key = msg.payload.decode('utf-8')
+        print(f"onCoordinatorKeyPress: key = {key}")
+        if key == 'E':
+            for gateid in GATE_IDS:
+                gate = self.idToStatusMap[gateid]
+                if not gate.alive:
+                    continue
+                self.gatecmd(gateid, "close")
+
     def on_message(self, client, userdata, msg):
         if msg.topic.startswith("/heartbeat"):
             self.onHeartbeat(msg)
@@ -181,6 +192,8 @@ class MqttClient:
             print("Processing gate acknowledgement")
             status = self.onStatusUpdate(msg)
             print(f"Gate {status.id} is {status.status}")
+        elif msg.topic.startswith("/coordinator_keypress"):
+            self.onCoordinatorKeyPress(msg)
 
     def gatecmd(self, gateid, gatecmd):
         print(f"Publishing message /gatecmd/{gateid} {gatecmd}")

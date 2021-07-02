@@ -4,3 +4,4 @@ firmware
 __pycache__
 *.sw?
 *.py?
+.vscode
