@@ -6,6 +6,9 @@ class UpdateStatus {
         this.idMap = {};
 
         $('#templates').hide();
+
+        this.addStatus('0', 'coordinator')
+
         for (let gateid of GATE_IDS) {
             let gate = this.addStatus(gateid, 'gate');
             $('#OPEN, #CLOSE, #MIDDLE, #CALIBRATE', gate).click((event) => {
@@ -15,7 +18,6 @@ class UpdateStatus {
 
         for (let toolid of TOOL_SENSOR_IDS) {
             this.addStatus(toolid, 'tool')
-            let tool = $("#templates .tool").clone();
         }
     
         setInterval(() => this.updateStatus(), 3000);
@@ -49,14 +51,22 @@ class UpdateStatus {
             $(statusDom).removeClass('alive');
             $(statusDom).removeClass('dead');
  
-            if (status === undefined || !status.alive) {
-                $(statusDom).hide();
-                continue;
-            } else {
+            if (status === undefined || status.lastTickTime.startsWith("0001")) {
+                if (id !== "0") {
+                    $(statusDom).hide();
+                    continue;
+                }
+            }
+            if (status.alive) {
                 $(statusDom).show();
                 $(statusDom).addClass('alive');
                 $('button', statusDom).prop('disabled', false);
                 $('#id', statusDom).html('' + id + '<br>' + status.status);
+            } else {
+                $(statusDom).show();
+                $(statusDom).addClass('dead');
+                $('button', statusDom).prop('disabled', true);
+                $('#id', statusDom).html('' + id + '<br>' + status.lastTickTime);
             }
 
         }

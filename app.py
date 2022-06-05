@@ -59,7 +59,7 @@ class MqttClient:
 
         self.idToStatusMap['0'] = Status('0')
 
-        self.client.connect("192.168.1.3", 1883, 60)
+        self.client.connect("127.0.0.1", 1883, 60)
         self.client.loop_start()
 
         self.loop = asyncio.new_event_loop()
@@ -222,7 +222,6 @@ def gate_status():
 
 @app.route("/update/<gateid>")
 def update(gateid=''):
-    print("Getting to update")
     md5HeaderName = 'X-Esp8266-Sketch-Md5'
     if not md5HeaderName in request.headers:
         return Response("Only for ESP8266", status=404)

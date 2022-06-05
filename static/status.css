@@ -8,7 +8,7 @@
     float: left;
 }
 
-.gate, .tool {
+.gate, .tool, .coordinator {
     padding: 10px;
 }
 
