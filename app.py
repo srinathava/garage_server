@@ -1,6 +1,6 @@
 import os
 from flask import Flask, Response
-from flask import send_file
+from flask import send_file, redirect, url_for
 from flask import request
 import paho.mqtt.client as mqtt
 from datetime import datetime, timedelta
@@ -207,7 +207,7 @@ def updateStatuses():
 
 @app.route("/")
 def hello_world():
-    return "<p>Hello, World!</p>"
+    return redirect("static/status.html")
 
 class MyEncoder(JSONEncoder):
     def default(self, o):

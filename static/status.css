@@ -1,6 +1,6 @@
 #id {
-    width: 50px;
-    height: 50px;
+    width: 8em;
+    height: 3em;
     text-align: center;
 }
 
@@ -15,6 +15,7 @@
 .alive #id {
     background-color: lightgreen;
 }
+
 .dead #id, .unknown #id {
     background-color: lightsalmon;
 }
