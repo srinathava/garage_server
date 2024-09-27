@@ -19,13 +19,14 @@ scheduler.init_app(app)
 scheduler.start()
 
 GATE_IDS = ['1', '2', '3', '4', '5', '6', '7']
-TOOL_SENSOR_IDS = ['tablesaw', 'jointer', 'bandsaw']
+TOOL_SENSOR_IDS = ['tablesaw', 'jointer', 'bandsaw', 'sander']
 GATE_MAX_KEEPALIVE = timedelta(minutes=1)
 
 GATES_FOR_TOOLS = {
     'tablesaw': ['6'],
     'jointer': ['5', '1'],
-    'bandsaw': ['5', '4']
+    'bandsaw': ['5', '4'],
+    'sander': ['5', '7']
 }
 
 class Status:

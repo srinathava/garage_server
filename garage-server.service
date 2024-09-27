@@ -1,0 +1,12 @@
+[Unit]
+Description=Garage server
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/home/pi/code/garage_server
+ExecStart=/usr/bin/bash run.sh
+User=pi
+
+[Install]
+WantedBy=multi-user.target
