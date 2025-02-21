@@ -1,5 +1,5 @@
 const GATE_IDS = ['1', '2', '3', '4', '5','6', '7'];
-const TOOL_SENSOR_IDS = ['tablesaw', 'jointer', 'bandsaw'];
+const TOOL_SENSOR_IDS = ['tablesaw', 'jointer', 'bandsaw', 'sander'];
 
 class UpdateStatus {
     constructor() {
