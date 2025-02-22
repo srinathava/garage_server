@@ -18,7 +18,6 @@ scheduler.api_enabled = True
 scheduler.init_app(app)
 scheduler.start()
 
-GATE_IDS = ['1', '2', '3', '4', '5', '6', '7']
 TOOL_SENSOR_IDS = ['tablesaw', 'jointer', 'bandsaw', 'sander']
 GATE_MAX_KEEPALIVE = timedelta(minutes=1)
 
@@ -52,13 +51,9 @@ class MqttClient:
 
         self.pendingFuture = None
 
-        self.idToStatusMap = {}
-        for id in GATE_IDS:
-            self.idToStatusMap[id] = GateStatus(id)
+        self.idToStatusMap = {'0': Status('0')}
         for id in TOOL_SENSOR_IDS:
             self.idToStatusMap[id] = ToolSensorStatus(id)
-
-        self.idToStatusMap['0'] = Status('0')
 
         self.client.connect("127.0.0.1", 1883, 60)
         self.client.loop_start()
@@ -83,7 +78,11 @@ class MqttClient:
         payload = msg.payload.decode('utf-8')
         # print(f"Processing heartbeat message from {gateid}: {payload}")
 
-        status = self.idToStatusMap[gateid]
+        status = self.idToStatusMap.get(gateid)
+        if status is None:
+            status = GateStatus(gateid)
+            self.idToStatusMap[gateid] = status
+
         status.alive = True
         status.lastTickTime = datetime.now()
 
@@ -95,7 +94,7 @@ class MqttClient:
         if gateid == '0':
             return
 
-        if gateid in GATE_IDS:
+        if gateid not in TOOL_SENSOR_IDS:
             status.status = msgJson['gatePos']
             
     def updateStatuses(self):
@@ -116,8 +115,7 @@ class MqttClient:
     def isSwitchedToTool(self, toolid):
         gateids = GATES_FOR_TOOLS[toolid]
 
-        for gateid in GATE_IDS:
-            gate = self.idToStatusMap[gateid]
+        for (gateid, gate) in self.idToStatusMap.items():
             if not gate.alive:
                 continue
 
@@ -137,10 +135,11 @@ class MqttClient:
 
     def switchToTool(self, toolid):
         gateids = GATES_FOR_TOOLS[toolid]
-        for gateid in GATE_IDS:
+        for (gateid, gate) in self.idToStatusMap.items():
             gate = self.idToStatusMap[gateid]
             if not gate.alive:
                 continue
+
             if gateid in gateids:
                 self.gatecmd(gateid, "open")
             else:
@@ -178,9 +177,8 @@ class MqttClient:
         key = msg.payload.decode('utf-8')
         print(f"onCoordinatorKeyPress: key = {key}")
         if key == 'E':
-            for gateid in GATE_IDS:
-                gate = self.idToStatusMap[gateid]
-                if not gate.alive:
+            for (gateid, status) in self.idToStatusMap.items():
+                if not status.alive:
                     continue
                 self.gatecmd(gateid, "close")
 
@@ -207,7 +205,7 @@ def updateStatuses():
     mqtt.updateStatuses()
 
 @app.route("/")
-def hello_world():
+def index():
     return redirect("static/status.html")
 
 class MyEncoder(JSONEncoder):
@@ -220,24 +218,6 @@ class MyEncoder(JSONEncoder):
 def gate_status():
     str = json.dumps(mqtt.idToStatusMap, cls=MyEncoder)
     return Response(str, mimetype='application/json')
-
-@app.route("/update/<gateid>")
-def update(gateid=''):
-    md5HeaderName = 'X-Esp8266-Sketch-Md5'
-    if not md5HeaderName in request.headers:
-        return Response("Only for ESP8266", status=404)
-
-    md5File = f'firmware/firmware.md5'
-    binFile = f'firmware/firmware.bin'
-    if not os.path.exists(md5File):
-        return Response("No update found", status=304)
-
-    md5 = open(md5File).read().split()[0]
-    if md5 == request.headers[md5HeaderName]:
-        return Response("No update found", status=304)
-    else:
-        print("Proving update")
-        return send_file(binFile, mimetype="application/octet-stream")
 
 @app.route("/gatecmd/<gateid>/<gatecmd>")
 def gatecmd(gateid, gatecmd):

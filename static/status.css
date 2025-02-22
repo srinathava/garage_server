@@ -1,21 +1,72 @@
-#id {
-    width: 8em;
-    height: 3em;
-    text-align: center;
-}
-
-#id, #OPEN, #CLOSE {
-    float: left;
-}
-
-.gate, .tool, .coordinator {
+/* Section styling */
+#coordinator-section, #tools-section, #gates-section {
+    margin: 10px;
     padding: 10px;
+    border-radius: 6px;
+    background-color: #f5f5f5;
 }
 
+h2 {
+    margin: 0 0 10px 0;
+    color: #333;
+    font-family: Arial, sans-serif;
+    font-size: 1.2em;
+}
+
+/* Card styling */
+.gate, .tool, .coordinator {
+    background: white;
+    border-radius: 6px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    margin: 5px;
+    padding: 8px;
+    display: inline-block;
+    min-width: 180px;
+    vertical-align: top;
+}
+
+#id {
+    text-align: center;
+    border-radius: 4px;
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: Arial, sans-serif;
+    font-weight: bold;
+    font-size: 0.9em;
+}
+
+/* Status colors */
 .alive #id {
-    background-color: lightgreen;
+    background-color: #90EE90;
+    color: #006400;
 }
 
 .dead #id, .unknown #id {
-    background-color: lightsalmon;
+    background-color: #FFB6C1;
+    color: #8B0000;
 }
+
+/* Button styling */
+button {
+    margin: 2px;
+    padding: 6px 10px;
+    border: none;
+    border-radius: 4px;
+    background-color: #4CAF50;
+    color: white;
+    cursor: pointer;
+    transition: background-color 0.3s;
+    font-size: 0.9em;
+}
+
+button:hover {
+    background-color: #45a049;
+}
+
+button:disabled {
+    background-color: #cccccc;
+    cursor: not-allowed;
+}
+
