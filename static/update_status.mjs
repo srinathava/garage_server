@@ -87,12 +87,12 @@ class UpdateStatus {
                 $(statusDom).show();
                 $(statusDom).addClass('alive');
                 $('button', statusDom).prop('disabled', false);
-                $('#id', statusDom).html('' + id + '<br>' + status.status);
+                $('#id', statusDom).html('' + id + ' (' + status.status + ')');
             } else {
                 $(statusDom).show();
                 $(statusDom).addClass('dead');
                 $('button', statusDom).prop('disabled', true);
-                $('#id', statusDom).html('' + id + '<br>' + status.lastTickTime);
+                $('#id', statusDom).html('' + id);
             }
         }
     }
