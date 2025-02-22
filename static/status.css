@@ -38,12 +38,12 @@ h2 {
 }
 
 /* Status colors */
-.alive #id {
+.alive {
     background-color: #90EE90;
     color: #006400;
 }
 
-.dead #id, .unknown #id {
+.dead, .unknown {
     background-color: #FFB6C1;
     color: #8B0000;
 }
