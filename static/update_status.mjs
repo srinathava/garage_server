@@ -11,6 +11,7 @@ class UpdateStatus {
         $('#main').append('<div id="tools-section"><h2>Tools</h2></div>');
         $('#main').append('<div id="gates-section"><h2>Gates</h2></div>');
 
+        this.setupModal();
         this.addStatus('0', 'coordinator', '#coordinator-section')
 
         for (let toolid of TOOL_SENSOR_IDS.sort()) {
@@ -18,6 +19,28 @@ class UpdateStatus {
         }
     
         setInterval(() => this.updateStatus(), 3000);
+    }
+
+    setupModal() {
+        // Close modal when clicking the X or outside the modal
+        $('.close, .modal').click((e) => {
+            if (e.target === e.currentTarget) {
+                $('#gate-modal').hide();
+            }
+        });
+
+        // Prevent modal content clicks from closing the modal
+        $('.modal-content').click((e) => e.stopPropagation());
+    }
+
+    showGateModal(gateId) {
+        const modal = $('#gate-modal');
+        modal.data('gateId', gateId);
+        $('.gate-controls button').off('click').on('click', (event) => {
+            this.sendGateCmd(gateId, event.target.id.toLowerCase());
+            modal.hide();
+        });
+        modal.show();
     }
 
     addStatus(id, klass, section) {
@@ -40,6 +63,9 @@ class UpdateStatus {
             if (!inserted) {
                 $(section).append(status);
             }
+
+            // Add click handler for the control button
+            $('.control-btn', status).click(() => this.showGateModal(id));
         } else {
             $(section).append(status);
         }
@@ -74,9 +100,6 @@ class UpdateStatus {
 
             if (statusDom === undefined) {
                 statusDom = this.addStatus(id, 'gate', '#gates-section');
-                $('#OPEN, #CLOSE, #MIDDLE, #CALIBRATE', statusDom).click((event) => {
-                    this.sendGateCmd(id, event.target.id.toLowerCase());
-                });
             }
 
             $(statusDom).removeClass('unknown');
