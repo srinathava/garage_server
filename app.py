@@ -1,12 +1,9 @@
-import os
 from flask import Flask, Response
-from flask import send_file, redirect, url_for
-from flask import request
+from flask import redirect
 import paho.mqtt.client as mqtt
 from datetime import datetime, timedelta
 from flask_apscheduler import APScheduler
 import json
-import asyncio
 from json import JSONEncoder
 import time
 import threading
@@ -58,9 +55,7 @@ class MqttClient:
         self.client.connect("127.0.0.1", 1883, 60)
         self.client.loop_start()
 
-        self.loop = asyncio.new_event_loop()
-
-    def on_connect(self, client, userdata, flags, rc):
+    def on_connect(self, *_):
         print("Connected to MQTT broker")
         self.client.subscribe("/gateack/#")
         self.client.subscribe("/gatecmd/#")
@@ -100,7 +95,7 @@ class MqttClient:
     def updateStatuses(self):
         # print("Updating gate status")
         now = datetime.now()
-        for (gateid, status) in self.idToStatusMap.items():
+        for (_, status) in self.idToStatusMap.items():
             if now - status.lastTickTime > GATE_MAX_KEEPALIVE:
                 status.alive = False
 
@@ -198,11 +193,11 @@ class MqttClient:
         print(f"Publishing message /gatecmd/{gateid} {gatecmd}")
         self.client.publish("/gatecmd/" + gateid, gatecmd)
 
-mqtt = MqttClient()
+mqtt_client = MqttClient()
 
 @scheduler.task('interval', seconds=10)
 def updateStatuses():
-    mqtt.updateStatuses()
+    mqtt_client.updateStatuses()
 
 @app.route("/")
 def index():
@@ -216,12 +211,12 @@ class MyEncoder(JSONEncoder):
 
 @app.route("/status")
 def gate_status():
-    str = json.dumps(mqtt.idToStatusMap, cls=MyEncoder)
+    str = json.dumps(mqtt_client.idToStatusMap, cls=MyEncoder)
     return Response(str, mimetype='application/json')
 
 @app.route("/gatecmd/<gateid>/<gatecmd>")
 def gatecmd(gateid, gatecmd):
-    mqtt.gatecmd(gateid, gatecmd)
+    mqtt_client.gatecmd(gateid, gatecmd)
     return "ok"
 
 if __name__ == '__main__':
