@@ -24,6 +24,7 @@ GATES_FOR_TOOLS = {
     'bandsaw': ['5', '4'],
     'sander': ['5', '7']
 }
+GATE_FOR_MANUAL = '10'
 
 class Status:
     def __init__(self, id):
@@ -50,7 +51,9 @@ class MqttClient:
 
         self.idToStatusMap = {'0': Status('0')}
         for id in TOOL_SENSOR_IDS:
-            self.idToStatusMap[id] = ToolSensorStatus(id)
+            tool = ToolSensorStatus(id)
+            tool.status = 'off'
+            self.idToStatusMap[id] = tool
 
         self.client.connect("127.0.0.1", 1883, 60)
         self.client.loop_start()
@@ -111,7 +114,7 @@ class MqttClient:
         gateids = GATES_FOR_TOOLS[toolid]
 
         for (gateid, gate) in self.idToStatusMap.items():
-            if not gate.alive:
+            if not gate.alive or not self.isGate(gateid):
                 continue
 
             shouldOpen = gateid in gateids
@@ -128,11 +131,14 @@ class MqttClient:
 
         return True
 
+    def isGate(self, id):
+        return id != '0' and id not in TOOL_SENSOR_IDS
+
     def switchToTool(self, toolid):
         gateids = GATES_FOR_TOOLS[toolid]
         for (gateid, gate) in self.idToStatusMap.items():
             gate = self.idToStatusMap[gateid]
-            if not gate.alive:
+            if not gate.alive or not self.isGate(gateid):
                 continue
 
             if gateid in gateids:
@@ -175,7 +181,10 @@ class MqttClient:
             for (gateid, status) in self.idToStatusMap.items():
                 if not status.alive:
                     continue
-                self.gatecmd(gateid, "close")
+                if gateid == GATE_FOR_MANUAL:
+                    self.gatecmd(gateid, "open")
+                else:
+                    self.gatecmd(gateid, "close")
 
     def on_message(self, client, userdata, msg):
         if msg.topic.startswith("/heartbeat"):

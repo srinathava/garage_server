@@ -38,7 +38,6 @@ class UpdateStatus {
         modal.data('gateId', gateId);
         $('.gate-controls button').off('click').on('click', (event) => {
             this.sendGateCmd(gateId, event.target.id.toLowerCase());
-            modal.hide();
         });
         modal.show();
     }
