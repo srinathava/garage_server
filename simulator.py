@@ -25,6 +25,11 @@ class VirtualDevice:
         self.type = type
         self.status = "off" if type == "tool" else "close"
         self.last_heartbeat = datetime.now() if type == "gate" else None
+        # Additional gate properties matching real controller
+        if type == "gate":
+            self.open_pos = 110  # Default from real controller
+            self.close_pos = 20  # Default from real controller
+            self.moving_until = None  # Timestamp when gate will finish moving
 
 class Simulator:
     def __init__(self):
@@ -50,6 +55,9 @@ class Simulator:
         print("Connected to MQTT broker")
         # Subscribe to gate commands
         self.client.subscribe("/gatecmd/#")
+        # Subscribe to position setting commands
+        self.client.subscribe("/setclosepos/#")
+        self.client.subscribe("/setopenpos/#")
         # Subscribe to coordinator commands
         self.client.subscribe("/coordinator/0")
 
@@ -60,14 +68,51 @@ class Simulator:
         if topic.startswith("/gatecmd/"):
             gate_id = topic.rsplit('/', 1)[1]
             if gate_id in self.gates:
-                self.client.publish(f'/gatelog/{gate_id}', f'Processing move command {payload}')
+                gate = self.gates[gate_id]
+                self.client.publish(f'/gatelog/{gate_id}', f'Processing move command: {payload}')
+                
                 if payload in ("open", "close", "middle"):
+                    # Check if already in position
+                    if gate.status == payload:
+                        self.client.publish(f'/gatelog/{gate_id}', f'Already at position {payload}')
+                    else:
+                        # Calculate target position
+                        if payload == "open":
+                            target_pos = gate.open_pos
+                        elif payload == "close":
+                            target_pos = gate.close_pos
+                        else:  # middle
+                            target_pos = (gate.open_pos + gate.close_pos) // 2
+                            
+                        # Set movement completion time (1 second from now)
+                        gate.moving_until = datetime.now().timestamp() + 1.0
+                        gate.status = payload
+                        print(f"Gate {gate_id} moving to {payload} (pos: {target_pos})")
+                    
                     # Send acknowledgment
                     self.client.publish(f"/gateack/{gate_id}", payload)
-                    print(f"Gate {gate_id} changed to {payload}")
-                    self.gates[gate_id].status = payload
                 else:
                     self.client.publish(f'/gatelog/{gate_id}', f'Unknown position {payload}')
+        
+        elif topic.startswith("/setclosepos/"):
+            gate_id = topic.rsplit('/', 1)[1]
+            if gate_id in self.gates:
+                try:
+                    pos = int(payload)
+                    self.gates[gate_id].close_pos = pos
+                    self.client.publish(f'/gatelog/{gate_id}', f'Setting close position to {pos}')
+                except ValueError:
+                    self.client.publish(f'/gatelog/{gate_id}', f'Invalid position value: {payload}')
+        
+        elif topic.startswith("/setopenpos/"):
+            gate_id = topic.rsplit('/', 1)[1]
+            if gate_id in self.gates:
+                try:
+                    pos = int(payload)
+                    self.gates[gate_id].open_pos = pos
+                    self.client.publish(f'/gatelog/{gate_id}', f'Setting open position to {pos}')
+                except ValueError:
+                    self.client.publish(f'/gatelog/{gate_id}', f'Invalid position value: {payload}')
         
         elif topic == "/coordinator/0":
             self.coordinator.status = payload
@@ -75,12 +120,23 @@ class Simulator:
 
     def send_heartbeats(self):
         while True:
+            current_time = datetime.now().timestamp()
+            
             for gate_id, gate in self.gates.items():
+                # Check if gate has finished moving
+                if gate.moving_until and current_time >= gate.moving_until:
+                    gate.moving_until = None
+                    self.client.publish(f'/gatelog/{gate_id}', f'Finished moving to {gate.status}')
+                
+                # Send enhanced heartbeat with position data
                 heartbeat = {
-                    "gatePos": gate.status
+                    "gatePos": gate.status,
+                    "openPos": gate.open_pos,
+                    "closedPos": gate.close_pos
                 }
                 self.client.publish(f"/heartbeat/{gate_id}", json.dumps(heartbeat))
-            time.sleep(30)  # Send heartbeat every 30 seconds
+            
+            time.sleep(3)  # Send heartbeat every 3 seconds like real controller
 
     def toggle_tool(self, tool_id):
         if tool_id in self.tools:
