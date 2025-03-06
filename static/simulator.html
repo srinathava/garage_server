@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Dust Collection Simulator</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .device { margin: 10px; padding: 10px; border: 1px solid #ccc; }
+        .tool { background-color: #f0f0f0; }
+        .gate { background-color: #e0e0e0; }
+        .status { font-weight: bold; }
+        button { margin: 5px; }
+    </style>
+</head>
+<body>
+    <h1>Dust Collection System Simulator</h1>
+    
+    <h2>Tools</h2>
+    <div id="tools"></div>
+    
+    <h2>Gates</h2>
+    <div id="gates"></div>
+    
+    <h2>Coordinator</h2>
+    <div id="coordinator"></div>
+
+    <script>
+        function updateStatus() {
+            fetch('/simulator/status')
+                .then(response => response.json())
+                .then(data => {
+                    document.getElementById('tools').innerHTML = Object.entries(data.tools)
+                        .map(([id, tool]) => `
+                            <div class="device tool">
+                                <h3>${id}</h3>
+                                <p>Status: <span class="status">${tool.status}</span></p>
+                                <button onclick="toggleTool('${id}')">Toggle</button>
+                            </div>
+                        `).join('');
+                    
+                    document.getElementById('gates').innerHTML = Object.entries(data.gates)
+                        .map(([id, gate]) => `
+                            <div class="device gate">
+                                <h3>Gate ${id}</h3>
+                                <p>Status: <span class="status">${gate.status}</span></p>
+                                <p>Last Heartbeat: ${new Date(gate.last_heartbeat).toLocaleString()}</p>
+                            </div>
+                        `).join('');
+                    
+                    document.getElementById('coordinator').innerHTML = `
+                        <div class="device">
+                            <h3>Coordinator</h3>
+                            <p>Status: <span class="status">${data.coordinator.status}</span></p>
+                        </div>
+                    `;
+                });
+        }
+
+        function toggleTool(id) {
+            fetch(`/simulator/toggle/${id}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        updateStatus();
+                    } else {
+                        alert(data.message);
+                    }
+                });
+        }
+
+        // Update status every second
+        setInterval(updateStatus, 1000);
+        updateStatus();
+    </script>
+</body>
+</html>

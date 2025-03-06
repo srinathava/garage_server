@@ -3,6 +3,8 @@ const TOOL_SENSOR_IDS = ['tablesaw', 'jointer', 'bandsaw', 'sander'];
 class UpdateStatus {
     constructor() {
         this.idMap = {};
+        this.mqttClient = null;
+        this.currentGateId = null;
 
         $('#templates').hide();
         
@@ -26,6 +28,7 @@ class UpdateStatus {
         $('.close, .modal').click((e) => {
             if (e.target === e.currentTarget) {
                 $('#gate-modal').hide();
+                this.disconnectMqtt();
             }
         });
 
@@ -40,6 +43,90 @@ class UpdateStatus {
             this.sendGateCmd(gateId, event.target.id.toLowerCase());
         });
         modal.show();
+        
+        // Clear previous logs
+        $('#gate-logs-content').text('Loading logs...');
+        
+        // Connect to MQTT and subscribe to gate logs
+        this.connectMqtt(gateId);
+    }
+    
+    connectMqtt(gateId) {
+        this.disconnectMqtt(); // Disconnect any existing connection
+        this.currentGateId = gateId;
+        
+        try {
+            // Create a client instance
+            const clientId = "garage_status_" + Math.random().toString(16).substr(2, 8);
+            this.mqttClient = new Paho.MQTT.Client(
+                window.location.hostname, // Same host as the web server
+                9001, // MQTT websocket port
+                clientId
+            );
+            
+            // Set callback handlers
+            this.mqttClient.onConnectionLost = this.onMqttConnectionLost.bind(this);
+            this.mqttClient.onMessageArrived = this.onMqttMessageArrived.bind(this);
+            
+            // Connect the client
+            this.mqttClient.connect({
+                onSuccess: () => {
+                    console.log("MQTT Connected");
+                    // Subscribe to the gate log topic
+                    const topic = `/gatelog/${gateId}`;
+                    this.mqttClient.subscribe(topic);
+                    $('#gate-logs-content').text('Connected to log stream...');
+                },
+                onFailure: (e) => {
+                    console.error("MQTT Connection failed: ", e);
+                    $('#gate-logs-content').text('Failed to connect to log stream.');
+                }
+            });
+        } catch (error) {
+            console.error("MQTT setup error:", error);
+            $('#gate-logs-content').text('Error setting up log connection.');
+        }
+    }
+    
+    disconnectMqtt() {
+        if (this.mqttClient && this.mqttClient.isConnected()) {
+            try {
+                if (this.currentGateId) {
+                    const topic = `/gatelog/${this.currentGateId}`;
+                    this.mqttClient.unsubscribe(topic);
+                }
+                this.mqttClient.disconnect();
+                console.log("MQTT Disconnected");
+            } catch (error) {
+                console.error("MQTT disconnect error:", error);
+            }
+        }
+        this.mqttClient = null;
+        this.currentGateId = null;
+    }
+    
+    onMqttConnectionLost(responseObject) {
+        if (responseObject.errorCode !== 0) {
+            console.log("MQTT Connection Lost: " + responseObject.errorMessage);
+            $('#gate-logs-content').append('\nConnection to log stream lost.');
+        }
+    }
+    
+    onMqttMessageArrived(message) {
+        const logMessage = message.payloadString;
+        const currentContent = $('#gate-logs-content').text();
+        
+        // If it's the loading message, replace it, otherwise append
+        if (currentContent === 'Loading logs...' || currentContent === 'Connected to log stream...') {
+            $('#gate-logs-content').text(logMessage);
+        } else {
+            // Append new log message with a newline
+            $('#gate-logs-content').append('\n' + logMessage);
+            
+            // Auto-scroll to bottom
+            const preElement = document.getElementById('gate-logs-content');
+            preElement.scrollTop = preElement.scrollHeight;
+        }
     }
 
     addStatus(id, klass, section) {
