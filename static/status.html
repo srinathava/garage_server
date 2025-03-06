@@ -26,7 +26,26 @@
                 <button id="CLOSE">Close</button>
                 <button id="OPEN">Open</button>
                 <button id="MIDDLE">Middle</button>
-                <button id="CALIBRATE">Calibrate</button>
+            </div>
+            <div class="gate-calibration">
+                <h4>Manual Calibration</h4>
+                <div class="calibration-control">
+                    <label for="close-position">Close Position:</label>
+                    <button class="adjust-btn minus" data-target="close-position">-</button>
+                    <input type="range" id="close-position" class="slider">
+                    <button class="adjust-btn plus" data-target="close-position">+</button>
+                    <span id="close-position-value">0</span>
+                </div>
+                <div class="calibration-control">
+                    <label for="open-position">Open Position:</label>
+                    <button class="adjust-btn minus" data-target="open-position">-</button>
+                    <input type="range" id="open-position" class="slider">
+                    <button class="adjust-btn plus" data-target="open-position">+</button>
+                    <span id="open-position-value">1000</span>
+                </div>
+                <div class="flash-control">
+                    <button id="flash-button">Flash</button>
+                </div>
             </div>
             <div class="gate-logs">
                 <h4>Gate Logs</h4>

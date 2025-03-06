@@ -1,5 +1,11 @@
 const TOOL_SENSOR_IDS = ['tablesaw', 'jointer', 'bandsaw', 'sander'];
 
+// Calibration slider configuration
+const CALIBRATION_MIN = 0;
+const CALIBRATION_MAX = 180;
+const CALIBRATION_DEFAULT_CLOSE = 20;
+const CALIBRATION_DEFAULT_OPEN = 110;
+
 class UpdateStatus {
     constructor() {
         this.idMap = {};
@@ -34,14 +40,94 @@ class UpdateStatus {
 
         // Prevent modal content clicks from closing the modal
         $('.modal-content').click((e) => e.stopPropagation());
+        
+        // Setup calibration sliders
+        this.setupCalibrationControls();
+    }
+    
+    setupCalibrationControls() {
+        // Handle slider changes for close position
+        $('#close-position').on('input', () => {
+            const closeVal = parseInt($('#close-position').val());
+            $('#close-position-value').text(closeVal);
+            
+            // Send calibration command immediately
+            if (this.currentGateId) {
+                this.sendCalibrationCmd(this.currentGateId, 'close', closeVal);
+            }
+        });
+        
+        // Handle slider changes for open position
+        $('#open-position').on('input', () => {
+            const openVal = parseInt($('#open-position').val());
+            $('#open-position-value').text(openVal);
+            
+            // Send calibration command immediately
+            if (this.currentGateId) {
+                this.sendCalibrationCmd(this.currentGateId, 'open', openVal);
+            }
+        });
+        
+        // Handle +/- button clicks
+        $('.adjust-btn').on('click', (event) => {
+            const button = $(event.currentTarget);
+            const targetId = button.data('target');
+            const isPlus = button.hasClass('plus');
+            const slider = $(`#${targetId}`);
+            
+            // Get current value
+            let currentVal = parseInt(slider.val());
+            
+            // Adjust value
+            if (isPlus) {
+                currentVal = Math.min(currentVal + 1, CALIBRATION_MAX);
+            } else {
+                currentVal = Math.max(currentVal - 1, CALIBRATION_MIN);
+            }
+            
+            // Update slider and display
+            slider.val(currentVal);
+            $(`#${targetId}-value`).text(currentVal);
+            
+            // Send calibration command
+            if (this.currentGateId) {
+                const type = targetId === 'close-position' ? 'close' : 'open';
+                this.sendCalibrationCmd(this.currentGateId, type, currentVal);
+            }
+        });
     }
 
     showGateModal(gateId) {
         const modal = $('#gate-modal');
         modal.data('gateId', gateId);
+        this.currentGateId = gateId;
+        
+        // Set up gate control buttons
         $('.gate-controls button').off('click').on('click', (event) => {
             this.sendGateCmd(gateId, event.target.id.toLowerCase());
         });
+        
+        // Set up flash button
+        $('#flash-button').off('click').on('click', () => {
+            this.sendFlashCmd(gateId);
+        });
+        
+        // Configure sliders with min, max, and default values
+        const closeSlider = $('#close-position');
+        const openSlider = $('#open-position');
+        
+        // Set min and max attributes
+        closeSlider.attr('min', CALIBRATION_MIN);
+        closeSlider.attr('max', CALIBRATION_MAX);
+        openSlider.attr('min', CALIBRATION_MIN);
+        openSlider.attr('max', CALIBRATION_MAX);
+        
+        // Set default values
+        closeSlider.val(CALIBRATION_DEFAULT_CLOSE);
+        $('#close-position-value').text(CALIBRATION_DEFAULT_CLOSE);
+        openSlider.val(CALIBRATION_DEFAULT_OPEN);
+        $('#open-position-value').text(CALIBRATION_DEFAULT_OPEN);
+        
         modal.show();
         
         // Clear previous logs
@@ -49,6 +135,48 @@ class UpdateStatus {
         
         // Connect to MQTT and subscribe to gate logs
         this.connectMqtt(gateId);
+    }
+    
+    sendCalibrationCmd(gateId, type, position) {
+        if (!this.mqttClient || !this.mqttClient.isConnected()) {
+            console.error("MQTT client not connected");
+            return;
+        }
+        
+        try {
+            const topic = type === 'open' ? `/setopenpos/${gateId}` : `/setclosepos/${gateId}`;
+            const message = new Paho.MQTT.Message(position.toString());
+            message.destinationName = topic;
+            this.mqttClient.send(message);
+        } catch (error) {
+            console.error("Error sending calibration command:", error);
+            $('#gate-logs-content').append('\nError sending calibration command: ' + error.message);
+        }
+    }
+    
+    sendFlashCmd(gateId) {
+        if (!this.mqttClient || !this.mqttClient.isConnected()) {
+            console.error("MQTT client not connected");
+            return;
+        }
+        
+        try {
+            const topic = `/flash/${gateId}`;
+            const message = new Paho.MQTT.Message("");
+            message.destinationName = topic;
+            this.mqttClient.send(message);
+            
+            // Add feedback to logs
+            const logMessage = `Sent flash command to gate ${gateId}`;
+            $('#gate-logs-content').append('\n' + logMessage);
+            
+            // Auto-scroll to bottom
+            const preElement = document.getElementById('gate-logs-content');
+            preElement.scrollTop = preElement.scrollHeight;
+        } catch (error) {
+            console.error("Error sending flash command:", error);
+            $('#gate-logs-content').append('\nError sending flash command: ' + error.message);
+        }
     }
     
     connectMqtt(gateId) {

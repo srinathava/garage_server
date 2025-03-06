@@ -126,10 +126,73 @@ h4 {
     font-size: 1em;
 }
 
-.gate-logs {
+.gate-calibration, .gate-logs {
     margin-top: 20px;
     border-top: 1px solid #eee;
     padding-top: 10px;
+}
+
+.calibration-control {
+    margin-bottom: 15px;
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.calibration-control label {
+    width: 120px;
+    font-size: 0.9em;
+    margin-right: 10px;
+}
+
+.calibration-control .slider {
+    flex: 1;
+    min-width: 150px;
+    margin: 0 5px;
+}
+
+.calibration-control span {
+    width: 40px;
+    text-align: right;
+    margin-left: 10px;
+}
+
+.adjust-btn {
+    width: 30px;
+    height: 30px;
+    padding: 0;
+    font-size: 16px;
+    font-weight: bold;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+}
+
+.adjust-btn.minus {
+    background-color: #f44336;
+}
+
+.adjust-btn.plus {
+    background-color: #4CAF50;
+}
+
+.flash-control {
+    margin-top: 20px;
+    text-align: center;
+}
+
+#flash-button {
+    background-color: #ff9800;
+    padding: 8px 20px;
+    font-size: 1em;
+    min-width: 120px;
+    border-radius: 4px;
+    transition: background-color 0.3s;
+}
+
+#flash-button:hover {
+    background-color: #f57c00;
 }
 
 #gate-logs-content {
