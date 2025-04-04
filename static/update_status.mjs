@@ -1,4 +1,4 @@
-const TOOL_SENSOR_IDS = ['tablesaw', 'jointer', 'bandsaw', 'sander'];
+const TOOL_SENSOR_IDS = ['tablesaw', 'jointer', 'bandsaw', 'sander', 'drillpress'];
 
 // Calibration slider configuration
 const CALIBRATION_MIN = 0;

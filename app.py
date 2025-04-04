@@ -15,7 +15,7 @@ scheduler.api_enabled = True
 scheduler.init_app(app)
 scheduler.start()
 
-TOOL_SENSOR_IDS = ['tablesaw', 'jointer', 'bandsaw', 'sander']
+TOOL_SENSOR_IDS = ['tablesaw', 'jointer', 'bandsaw', 'sander', 'drillpress']
 GATE_MAX_KEEPALIVE = timedelta(minutes=1)
 
 GATES_FOR_TOOLS = {
@@ -23,6 +23,7 @@ GATES_FOR_TOOLS = {
     'jointer': ['5', '1'],
     'bandsaw': ['5', '4'],
     'sander': ['5', '7']
+    'drillpress': ['5', '7']
 }
 GATE_FOR_MANUAL = '10'
 
