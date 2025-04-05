@@ -22,7 +22,7 @@ GATES_FOR_TOOLS = {
     'tablesaw': ['6'],
     'jointer': ['5', '1'],
     'bandsaw': ['5', '4'],
-    'sander': ['5', '7']
+    'sander': ['5', '7'],
     'drillpress': ['5', '7']
 }
 GATE_FOR_MANUAL = '10'
