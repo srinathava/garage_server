@@ -1,4 +1,3 @@
-const TOOL_SENSOR_IDS = ['tablesaw', 'jointer', 'bandsaw', 'sander', 'drillpress'];
 
 // Calibration slider configuration
 const CALIBRATION_MIN = 0;
@@ -21,9 +20,6 @@ class UpdateStatus {
         this.setupModal();
         this.addStatus('0', 'coordinator', '#coordinator-section')
 
-        for (let toolid of TOOL_SENSOR_IDS.sort()) {
-            this.addStatus(toolid, 'tool', '#tools-section')
-        }
     
         setInterval(() => this.updateStatus(), 3000);
     }
@@ -314,19 +310,42 @@ class UpdateStatus {
     
         // Sort entries, handling numeric gate IDs properly
         const entries = Object.entries(this.statusMap);
+        // Sort entries: coordinator first, then numerically for gates, then alphabetically for tools
         const sortedEntries = entries.sort((a, b) => {
-            // Skip sorting for coordinator and tools
-            if (a[0] === '0' || b[0] === '0') return 0;
-            if (TOOL_SENSOR_IDS.includes(a[0]) || TOOL_SENSOR_IDS.includes(b[0])) return 0;
-            // Numeric sort for gates
-            return parseInt(a[0]) - parseInt(b[0]);
+            const idA = a[0];
+            const idB = b[0];
+            const isNumericA = !isNaN(parseInt(idA));
+            const isNumericB = !isNaN(parseInt(idB));
+
+            if (idA === '0') return -1; // Coordinator always first
+            if (idB === '0') return 1;
+
+            if (isNumericA && isNumericB) {
+                return parseInt(idA) - parseInt(idB); // Numeric sort for gates
+            } else if (isNumericA) {
+                return 1; // Gates after tools (or change to -1 if gates should come first)
+            } else if (isNumericB) {
+                return -1; // Tools before gates (or change to 1 if tools should come after)
+            } else {
+                return idA.localeCompare(idB); // Alphabetical sort for tools
+            }
         });
 
         for (const [id, status] of sortedEntries) {
             let statusDom = this.idMap[id];
 
-            if (statusDom === undefined) {
-                statusDom = this.addStatus(id, 'gate', '#gates-section');
+            if (statusDom === undefined && id !== '0') { // Don't re-add coordinator
+                const isNumericId = !isNaN(parseInt(id));
+                if (isNumericId) {
+                    // It's a gate (numeric ID, not '0')
+                    statusDom = this.addStatus(id, 'gate', '#gates-section');
+                } else {
+                    // It's a tool (non-numeric ID)
+                    statusDom = this.addStatus(id, 'tool', '#tools-section');
+                }
+            } else if (statusDom === undefined && id === '0') {
+                 // Coordinator already added in constructor, find it
+                 statusDom = this.idMap[id];
             }
 
             $(statusDom).removeClass('unknown');
