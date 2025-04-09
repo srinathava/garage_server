@@ -45,37 +45,51 @@ class UpdateStatus {
     }
     
     setupCalibrationControls() {
-        // Handle slider changes for close position
-        $('#close-position').on('input', () => {
-            const closeVal = parseInt($('#close-position').val());
-            $('#close-position-value').text(closeVal);
-            
-            // Send calibration command immediately
-            if (this.currentGateId) {
-                this.sendCalibrationCmd(this.currentGateId, 'close', closeVal);
+        // Handle text input changes for close position
+        const validateInput = (val) => {
+            // Validate input
+            if (isNaN(val)) {
+                val = CALIBRATION_MIN;
+            } else {
+                val = Math.max(CALIBRATION_MIN, Math.min(val, CALIBRATION_MAX));
             }
-        });
+            return val;
+        };
+
+        const handlePositionChange = (prefix) => {
+            // Get and validate the input value
+            const inputElement = $(`#${prefix}-position`);
+            const rawValue = inputElement.val();
+            const validatedValue = validateInput(parseInt(rawValue));
+            
+            // Update input and display elements
+            inputElement.val(validatedValue);
+            $(`#${prefix}-position-value`).text(validatedValue);
+            
+            // Send calibration command if gate is selected
+            if (this.currentGateId) {
+                this.sendCalibrationCmd(this.currentGateId, prefix, validatedValue);
+            }
+        };
         
-        // Handle slider changes for open position
-        $('#open-position').on('input', () => {
-            const openVal = parseInt($('#open-position').val());
-            $('#open-position-value').text(openVal);
-            
-            // Send calibration command immediately
-            if (this.currentGateId) {
-                this.sendCalibrationCmd(this.currentGateId, 'open', openVal);
-            }
-        });
+        // Attach event handlers for position inputs
+        $('#close-position').on('change', () => handlePositionChange('close'));
+        $('#open-position').on('change', () => handlePositionChange('open'));
         
         // Handle +/- button clicks
         $('.adjust-btn').on('click', (event) => {
             const button = $(event.currentTarget);
             const targetId = button.data('target');
             const isPlus = button.hasClass('plus');
-            const slider = $(`#${targetId}`);
+            const input = $(`#${targetId}`);
             
             // Get current value
-            let currentVal = parseInt(slider.val());
+            let currentVal = parseInt(input.val());
+            
+            // Handle NaN case
+            if (isNaN(currentVal)) {
+                currentVal = CALIBRATION_MIN;
+            }
             
             // Adjust value
             if (isPlus) {
@@ -84,8 +98,8 @@ class UpdateStatus {
                 currentVal = Math.max(currentVal - 1, CALIBRATION_MIN);
             }
             
-            // Update slider and display
-            slider.val(currentVal);
+            // Update input and display
+            input.val(currentVal);
             $(`#${targetId}-value`).text(currentVal);
             
             // Send calibration command
@@ -115,22 +129,16 @@ class UpdateStatus {
             this.sendFlashCmd(gateId);
         });
         
-        // Configure sliders with min, max, and default values
-        const closeSlider = $('#close-position');
-        const openSlider = $('#open-position');
-        
-        // Set min and max attributes
-        closeSlider.attr('min', CALIBRATION_MIN);
-        closeSlider.attr('max', CALIBRATION_MAX);
-        openSlider.attr('min', CALIBRATION_MIN);
-        openSlider.attr('max', CALIBRATION_MAX);
+        // Configure text inputs with default values
+        const closeInput = $('#close-position');
+        const openInput = $('#open-position');
         
         // Set default values
         const closedPos = status.json.closedPos;
         const openPos = status.json.openPos;
-        closeSlider.val(closedPos);
+        closeInput.val(closedPos);
         $('#close-position-value').text(closedPos);
-        openSlider.val(openPos);
+        openInput.val(openPos);
         $('#open-position-value').text(openPos);
         
         modal.show();
