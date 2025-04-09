@@ -33,6 +33,7 @@ class Status:
         self.alive = False
         self.lastTickTime = datetime.min
         self.status = '?'
+        self.json = None
 
 class GateStatus(Status):
     def __init__(self, id):
@@ -93,6 +94,7 @@ class MqttClient:
         if gateid == '0':
             return
 
+        status.json = msgJson
         if gateid not in TOOL_SENSOR_IDS:
             status.status = msgJson['gatePos']
             

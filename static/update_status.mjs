@@ -3,14 +3,13 @@ const TOOL_SENSOR_IDS = ['tablesaw', 'jointer', 'bandsaw', 'sander', 'drillpress
 // Calibration slider configuration
 const CALIBRATION_MIN = 0;
 const CALIBRATION_MAX = 180;
-const CALIBRATION_DEFAULT_CLOSE = 20;
-const CALIBRATION_DEFAULT_OPEN = 110;
 
 class UpdateStatus {
     constructor() {
         this.idMap = {};
         this.mqttClient = null;
         this.currentGateId = null;
+        this.statusMap = null;
 
         $('#templates').hide();
         
@@ -98,6 +97,10 @@ class UpdateStatus {
     }
 
     showGateModal(gateId) {
+        const status = this.statusMap[gateId];
+        if (status.json.openPos === undefined) {
+            return;
+        }
         const modal = $('#gate-modal');
         modal.data('gateId', gateId);
         this.currentGateId = gateId;
@@ -123,10 +126,12 @@ class UpdateStatus {
         openSlider.attr('max', CALIBRATION_MAX);
         
         // Set default values
-        closeSlider.val(CALIBRATION_DEFAULT_CLOSE);
-        $('#close-position-value').text(CALIBRATION_DEFAULT_CLOSE);
-        openSlider.val(CALIBRATION_DEFAULT_OPEN);
-        $('#open-position-value').text(CALIBRATION_DEFAULT_OPEN);
+        const closedPos = status.json.closedPos;
+        const openPos = status.json.openPos;
+        closeSlider.val(closedPos);
+        $('#close-position-value').text(closedPos);
+        openSlider.val(openPos);
+        $('#open-position-value').text(openPos);
         
         modal.show();
         
@@ -296,11 +301,11 @@ class UpdateStatus {
 
     async updateStatus() {
         let response = await fetch("/status")
-        let statusMap = await response.json()
-        console.log(statusMap);
+        this.statusMap = await response.json()
+        console.log(this.statusMap);
     
         // Sort entries, handling numeric gate IDs properly
-        const entries = Object.entries(statusMap);
+        const entries = Object.entries(this.statusMap);
         const sortedEntries = entries.sort((a, b) => {
             // Skip sorting for coordinator and tools
             if (a[0] === '0' || b[0] === '0') return 0;
