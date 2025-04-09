@@ -19,8 +19,6 @@ class UpdateStatus {
 
         this.setupModal();
         this.addStatus('0', 'coordinator', '#coordinator-section')
-
-    
         setInterval(() => this.updateStatus(), 3000);
     }
 
@@ -322,10 +320,8 @@ class UpdateStatus {
 
             if (isNumericA && isNumericB) {
                 return parseInt(idA) - parseInt(idB); // Numeric sort for gates
-            } else if (isNumericA) {
-                return 1; // Gates after tools (or change to -1 if gates should come first)
-            } else if (isNumericB) {
-                return -1; // Tools before gates (or change to 1 if tools should come after)
+            } else if (isNumericA != isNumericB) {
+                return 1; // doesn't matter since tools and gates go into different sections
             } else {
                 return idA.localeCompare(idB); // Alphabetical sort for tools
             }
@@ -334,18 +330,15 @@ class UpdateStatus {
         for (const [id, status] of sortedEntries) {
             let statusDom = this.idMap[id];
 
-            if (statusDom === undefined && id !== '0') { // Don't re-add coordinator
+            // Assuming 'statusDom = this.idMap[id];' happened just before this block.
+            // This block executes only if the element wasn't found in the initial lookup.
+            // Since the coordinator ('0') is always pre-added, this only applies to new gates/tools.
+            if (statusDom === undefined) {
+                // Add the new gate or tool.
                 const isNumericId = !isNaN(parseInt(id));
-                if (isNumericId) {
-                    // It's a gate (numeric ID, not '0')
-                    statusDom = this.addStatus(id, 'gate', '#gates-section');
-                } else {
-                    // It's a tool (non-numeric ID)
-                    statusDom = this.addStatus(id, 'tool', '#tools-section');
-                }
-            } else if (statusDom === undefined && id === '0') {
-                 // Coordinator already added in constructor, find it
-                 statusDom = this.idMap[id];
+                const section = isNumericId ? '#gates-section' : '#tools-section';
+                const type = isNumericId ? 'gate' : 'tool';
+                statusDom = this.addStatus(id, type, section);
             }
 
             $(statusDom).removeClass('unknown');
