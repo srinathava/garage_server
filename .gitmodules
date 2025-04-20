@@ -1,0 +1,3 @@
+[submodule "sps30"]
+	path = sps30
+	url = git@github.com:dvsu/sps30.git
