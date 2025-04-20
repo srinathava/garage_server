@@ -18,3 +18,6 @@ nmcli con mod Hotspot \
 
 # Activate the connection
 nmcli con up Hotspot
+
+# Ensure that preconfigured uses wlan0 so they both services start reliably
+nmcli con mod preconfigured ifname wlan0
