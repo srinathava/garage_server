@@ -97,3 +97,30 @@
     padding: 2px;
     text-align: center;
 }
+
+
+#heartbeat-status > .tool {
+    display: inline-block;
+    padding: 5px;
+    border-radius: 4px;
+    background-color: lightgreen;
+    margin: 2px;
+}
+#heartbeat-status > .tool.dead {
+    background-color: lightcoral;
+}
+
+#open-manual-gate {
+    /* make this look like a button */
+    background-color: #4CAF50;
+    color: white;
+    padding: 10px 20px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 16px;
+    text-align: center;
+    text-decoration: none;
+    display: inline-block;
+    margin: 4px 2px;
+}

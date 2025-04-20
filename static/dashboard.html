@@ -10,6 +10,14 @@
 </head>
 <body>
     <div class="dashboard">
+        <div class="dashboard-card">
+            <h2 class="card-title">Tool Heartbeat Status</h2>
+            <div id="heartbeat-status"></div>
+        </div>
+        <div class="dashboard-card">
+            <h2 class="card-title">Open manual gate</h2>
+            <div id="open-manual-gate">Open manual gate</div>
+        </div>
         <div class="dashboard-card sensor-charts">
             <h2 class="card-title">Air Quality Sensors</h2>
             <div id="charts-container">
@@ -34,5 +42,6 @@
             }, 1000);
         });
     </script>
+    <script src="dashboard.mjs" type="module"></script>
 </body>
 </html>

@@ -199,6 +199,15 @@ class MqttClient:
         time.sleep(0.2)
         self.turnOnDustCollector()
 
+    def openManualGate(self):
+        for (gateid, status) in self.idToStatusMap.items():
+            if not status.alive:
+                continue
+            if gateid == GATE_FOR_MANUAL:
+                self.gatecmd(gateid, "open")
+            else:
+                self.gatecmd(gateid, "close")
+
     def onToolSensor(self, msg):
         print("Getting tool sensor message")
         status = self.onStatusUpdate(msg)
@@ -303,6 +312,10 @@ def sps30():
 def gatecmd(gateid, gatecmd):
     mqtt_client.gatecmd(gateid, gatecmd)
     return "ok"
+
+@app.route("/open-manual-gate")
+def open_manual_gate():
+    mqtt_client.openManualGate()
 
 @app.route("/sensor_history")
 def sensor_history():
