@@ -9,11 +9,9 @@ class UpdateStatus {
         $('#templates').hide();
         
         // Create sections for organization
-        $('#main').append('<div id="coordinator-section"></div>');
         $('#main').append('<div id="tools-section"><h2>Tools</h2></div>');
         $('#main').append('<div id="gates-section"><h2>Gates</h2></div>');
 
-        this.addStatus('0', 'coordinator', '#coordinator-section')
         setInterval(() => this.updateStatus(), 3000);
     }
 
@@ -67,9 +65,6 @@ class UpdateStatus {
             const idB = b[0];
             const isNumericA = !isNaN(parseInt(idA));
             const isNumericB = !isNaN(parseInt(idB));
-
-            if (idA === '0') return -1; // Coordinator always first
-            if (idB === '0') return 1;
 
             if (isNumericA && isNumericB) {
                 return parseInt(idA) - parseInt(idB); // Numeric sort for gates

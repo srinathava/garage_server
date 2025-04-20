@@ -7,6 +7,31 @@ import json
 from json import JSONEncoder
 import time
 import threading
+import os
+import sys
+
+# Setup for GPIO control of dust collector remote
+import RPi.GPIO as GPIO
+
+DC_ON_PIN = 23
+DC_OFF_PIN = 24
+GPIO.setmode(GPIO.BCM) # Broadcom pin-numbering scheme
+GPIO.setup(DC_ON_PIN, GPIO.OUT)
+GPIO.setup(DC_OFF_PIN, GPIO.OUT)
+
+# Importing the SPS30 library
+script_dir = os.path.dirname(os.path.abspath(__file__))
+sys.path.append(os.path.join(script_dir, 'sps30'))
+from sps30 import SPS30
+
+pm_sensor = SPS30()
+print(f"Firmware version: {pm_sensor.firmware_version()}")
+print(f"Product type: {pm_sensor.product_type()}")
+print(f"Serial number: {pm_sensor.serial_number()}")
+print(f"Status register: {pm_sensor.read_status_register()}")
+print(
+    f"Auto cleaning interval: {pm_sensor.read_auto_cleaning_interval()}s")
+pm_sensor.start_measurement()
 
 app = Flask(__name__, static_folder="static")
 
@@ -51,7 +76,7 @@ class MqttClient:
 
         self.pendingFuture = None
 
-        self.idToStatusMap = {'0': Status('0')}
+        self.idToStatusMap = {}
         for id in TOOL_SENSOR_IDS:
             tool = ToolSensorStatus(id)
             tool.status = 'off'
@@ -66,7 +91,6 @@ class MqttClient:
         self.client.subscribe("/gatecmd/#")
         self.client.subscribe("/heartbeat/#")
         self.client.subscribe("/tool_sensor/#")
-        self.client.subscribe("/coordinator_keypress/#")
 
     def gateid(self, topic):
         # All our topics to gates are of the form "/gatecmd/1". Hence we split
@@ -89,9 +113,6 @@ class MqttClient:
         try:
             msgJson = json.loads(payload)
         except json.decoder.JSONDecodeError:
-            return
-
-        if gateid == '0':
             return
 
         status.json = msgJson
@@ -135,7 +156,17 @@ class MqttClient:
         return True
 
     def isGate(self, id):
-        return id != '0' and id not in TOOL_SENSOR_IDS
+        return id not in TOOL_SENSOR_IDS
+
+    def turnOnDustCollector(self):
+        GPIO.output(DC_ON_PIN, GPIO.HIGH)
+        time.sleep(0.7)
+        GPIO.output(DC_ON_PIN, GPIO.LOW)
+
+    def turnOffDustCollector(self):
+        GPIO.output(DC_OFF_PIN, GPIO.HIGH)
+        time.sleep(0.7)
+        GPIO.output(DC_OFF_PIN, GPIO.LOW)
 
     def switchToTool(self, toolid):
         gateids = GATES_FOR_TOOLS[toolid]
@@ -161,7 +192,7 @@ class MqttClient:
 
         print("Telling coordinator to turn on DC")
         time.sleep(0.2)
-        self.client.publish("/coordinator/0", "dc_on")
+        self.turnOnDustCollector()
 
     def onToolSensor(self, msg):
         print("Getting tool sensor message")
@@ -175,20 +206,7 @@ class MqttClient:
             t.start()
         else:
             print("Telling coordinator to turn off DC")
-            self.client.publish("/coordinator/0", "dc_off")
-
-    def onCoordinatorKeyPress(self, msg):
-        key = msg.payload.decode('utf-8')
-        print(f"onCoordinatorKeyPress: key = {key}")
-        if key == 'E':
-            for (gateid, status) in self.idToStatusMap.items():
-                if not status.alive:
-                    continue
-                if gateid == GATE_FOR_MANUAL:
-                    self.gatecmd(gateid, "open")
-                else:
-                    self.gatecmd(gateid, "close")
-
+            self.turnOffDustCollector()
     def on_message(self, client, userdata, msg):
         if msg.topic.startswith("/heartbeat"):
             self.onHeartbeat(msg)
@@ -225,6 +243,11 @@ class MyEncoder(JSONEncoder):
 def gate_status():
     str = json.dumps(mqtt_client.idToStatusMap, cls=MyEncoder)
     return Response(str, mimetype='application/json')
+
+@app.route("/sps30")
+def sps30():
+    measurement = pm_sensor.get_measurement()
+    return measurement
 
 @app.route("/gatecmd/<gateid>/<gatecmd>")
 def gatecmd(gateid, gatecmd):

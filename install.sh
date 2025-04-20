@@ -7,7 +7,9 @@ sudo cp mosquitto.conf /etc/mosquitto/conf.d/user.conf
 sudo systemctl enable mosquitto
 sudo systemctl start mosquitto
 
-python -m venv .venv
+# system site-packages because RPi.GPIO on pypi
+# seems to be older than the one in the Raspbian repo!
+python -m venv --system-site-packages .venv
 source ./.venv/bin/activate
 pip install -r requirements.txt
 deactivate
