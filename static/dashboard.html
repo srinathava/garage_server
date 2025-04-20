@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard Example with Compact Sensor Charts</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@3.7.1/dist/chart.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@2.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+    <link rel="stylesheet" href="dashboard.css">
+</head>
+<body>
+    <div class="dashboard">
+        <div class="dashboard-card sensor-charts">
+            <h2 class="card-title">Air Quality Sensors</h2>
+            <div id="charts-container">
+                <div class="table-header">
+                    <div>Sensor</div>
+                    <div>Trend</div>
+                    <div>Latest Value</div>
+                    <div>Status</div>
+                </div>
+                <!-- Charts will be dynamically added here -->
+            </div>
+        </div>
+
+    </div>
+
+    <script src="sensor_history.mjs" type="module"></script>
+    <script type="module">
+        import { initDashboard, DISPLAY_MODE } from './sensor_history.mjs';
+        window.addEventListener('load', () => {
+            setTimeout(() => {
+                initDashboard(DISPLAY_MODE.COMPACT);
+            }, 1000);
+        });
+    </script>
+</body>
+</html>

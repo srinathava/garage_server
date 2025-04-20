@@ -9,6 +9,7 @@ import time
 import threading
 import os
 import sys
+import pandas as pd
 
 # Setup for GPIO control of dust collector remote
 import RPi.GPIO as GPIO
@@ -81,6 +82,10 @@ class MqttClient:
             tool = ToolSensorStatus(id)
             tool.status = 'off'
             self.idToStatusMap[id] = tool
+
+        # History for sensor data using Pandas DataFrame
+        self.sensor_history_df = pd.DataFrame()
+        self.MAX_HISTORY_RECORDS = 3600 # 1 hour at 1 second intervals (60*60)
 
         self.client.connect("127.0.0.1", 1883, 60)
         self.client.loop_start()
@@ -219,6 +224,45 @@ class MqttClient:
         elif msg.topic.startswith("/coordinator_keypress"):
             self.onCoordinatorKeyPress(msg)
 
+    def update_sensor_history(self):
+        """Reads sensor, records data into DataFrame, and prunes old entries."""
+        # 1. Read Sensor
+        measurement = pm_sensor.get_measurement()
+        if not measurement:
+            print("Failed to get sensor measurement.")
+            return # Exit if no measurement
+
+        # 2. Record Data (No broad try/except)
+        timestamp_unix = measurement['timestamp']
+        timestamp_dt = datetime.fromtimestamp(timestamp_unix)
+        sensor_data = measurement['sensor_data']
+
+        # Flatten the nested dictionary
+        flat_data = {}
+        for category, metrics in sensor_data.items():
+            if isinstance(metrics, dict):
+                for metric_name, value in metrics.items():
+                    flat_data[f"{category}.{metric_name}"] = value
+            elif isinstance(metrics, (int, float)):
+                flat_data[category] = metrics
+            # Ignoring unit fields
+
+        if not flat_data:
+            print("No metrics extracted from sensor data.")
+            return # Exit if no data extracted
+
+        # Create a single-row DataFrame with timestamp index
+        new_row_df = pd.DataFrame(flat_data, index=[timestamp_dt])
+
+        # Concatenate with the main history DataFrame
+        self.sensor_history_df = pd.concat([self.sensor_history_df, new_row_df])
+
+        # 3. Prune History (Keep fixed number of records)
+        if len(self.sensor_history_df) > self.MAX_HISTORY_RECORDS:
+            # Drop the oldest record(s) to maintain size
+            self.sensor_history_df = self.sensor_history_df.iloc[1:]
+
+
     def gatecmd(self, gateid, gatecmd):
         print(f"Publishing message /gatecmd/{gateid} {gatecmd}")
         self.client.publish("/gatecmd/" + gateid, gatecmd)
@@ -228,6 +272,12 @@ mqtt_client = MqttClient()
 @scheduler.task('interval', seconds=10)
 def updateStatuses():
     mqtt_client.updateStatuses()
+
+@scheduler.task('interval', seconds=1, id='record_sensor_data_job')
+def record_and_prune_sensor_data():
+    """Scheduled task to read sensor, record data, and prune history."""
+    mqtt_client.update_sensor_history()
+
 
 @app.route("/")
 def index():
@@ -253,6 +303,17 @@ def sps30():
 def gatecmd(gateid, gatecmd):
     mqtt_client.gatecmd(gateid, gatecmd)
     return "ok"
+
+@app.route("/sensor_history")
+def sensor_history():
+    """Returns the 1-hour sensor data history as JSON."""
+    if mqtt_client.sensor_history_df.empty:
+        return Response("[]", mimetype='application/json') # Return empty list if no data
+
+    # Convert DataFrame to JSON, handling timestamps
+    # 'records' orientation gives a list of dicts, 'iso' format for dates
+    json_data = mqtt_client.sensor_history_df.reset_index().rename(columns={'index': 'timestamp'}).to_json(orient='records', date_format='iso')
+    return Response(json_data, mimetype='application/json')
 
 if __name__ == '__main__':
     app.run()

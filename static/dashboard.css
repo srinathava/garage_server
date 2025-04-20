@@ -1,0 +1,99 @@
+/* Dashboard-specific CSS */
+
+@import url('sensor_common.css');
+
+.dashboard {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 20px;
+}
+
+.dashboard-card {
+    background-color: white;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    padding: 15px;
+}
+
+.card-title {
+    margin-top: 0;
+    margin-bottom: 15px;
+    font-size: 18px;
+    color: #333;
+}
+
+.sensor-charts {
+    grid-column: span 4;
+}
+
+/* Table-like styling for charts */
+#charts-container {
+    display: table;
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.chart-wrapper {
+    display: table-row;
+    border-bottom: 1px solid #e0e0e0;
+}
+
+.chart-wrapper:nth-child(even) {
+    background-color: #f9f9f9;
+}
+
+.chart-wrapper:hover {
+    background-color: #f0f0f0;
+}
+
+.sensor-label {
+    display: table-cell;
+    padding: 2px;
+    font-weight: bold;
+    vertical-align: middle;
+    width: 200px;
+    border-right: 1px solid #e0e0e0;
+}
+
+.canvas-container {
+    display: table-cell;
+    padding: 2px;
+    vertical-align: middle;
+    width: 150px;
+}
+
+.canvas-container canvas {
+    position: relative;
+    height: 30px !important;
+    width: 150px !important;
+}
+
+.latest-value {
+    display: table-cell;
+    padding: 2px;
+    width: 100px;
+    border-left: 1px solid #e0e0e0;
+}
+
+.status-indicator {
+    display: table-cell;
+    padding: 2px;
+    vertical-align: middle;
+    text-align: center;
+    width: 100px;
+    border-left: 1px solid #e0e0e0;
+}
+
+/* Add table header */
+.table-header {
+    display: table-row;
+    background-color: #f0f0f0;
+    font-weight: bold;
+    border-bottom: 2px solid #ccc;
+}
+
+.table-header div {
+    display: table-cell;
+    padding: 2px;
+    text-align: center;
+}
