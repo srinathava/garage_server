@@ -315,7 +315,21 @@ def gatecmd(gateid, gatecmd):
 
 @app.route("/open-manual-gate")
 def open_manual_gate():
+    """Opens the manual gate and closes all others."""
+    print("Opening manual gate")
     mqtt_client.openManualGate()
+    return "ok"
+
+@app.route("/dust-collector/<action>")
+def dust_collector(action):
+    """Controls the dust collector."""
+    if action == "on":
+        mqtt_client.turnOnDustCollector()
+    elif action == "off":
+        mqtt_client.turnOffDustCollector()
+    else:
+        return "Invalid action", 400
+    return "ok"
 
 @app.route("/sensor_history")
 def sensor_history():
