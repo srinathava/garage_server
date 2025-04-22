@@ -134,11 +134,11 @@ export class Calibrator {
 
         const closeInput = $('#close-position');
         const openInput = $('#open-position');
-        const closedPos = status.json.closedPos;
+        const closePos = status.json.closePos;
         const openPos = status.json.openPos;
 
-        closeInput.val(closedPos);
-        $('#close-position-value').text(closedPos);
+        closeInput.val(closePos);
+        $('#close-position-value').text(closePos);
         openInput.val(openPos);
         $('#open-position-value').text(openPos);
     }

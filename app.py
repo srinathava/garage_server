@@ -85,6 +85,7 @@ class MqttClient:
 
         # History for sensor data using Pandas DataFrame
         self.sensor_history_df = pd.DataFrame()
+        self.last_measurement = None
         self.MAX_HISTORY_RECORDS = 3600 # 1 hour at 1 second intervals (60*60)
 
         self.client.connect("127.0.0.1", 1883, 60)
@@ -201,7 +202,7 @@ class MqttClient:
 
     def openManualGate(self):
         for (gateid, status) in self.idToStatusMap.items():
-            if not status.alive:
+            if not status.alive or not self.isGate(gateid):
                 continue
             if gateid == GATE_FOR_MANUAL:
                 self.gatecmd(gateid, "open")
@@ -221,6 +222,7 @@ class MqttClient:
         else:
             print("Telling coordinator to turn off DC")
             self.turnOffDustCollector()
+            
     def on_message(self, client, userdata, msg):
         if msg.topic.startswith("/heartbeat"):
             self.onHeartbeat(msg)
@@ -240,6 +242,8 @@ class MqttClient:
         if not measurement:
             print("Failed to get sensor measurement.")
             return # Exit if no measurement
+
+        self.last_measurement = measurement
 
         # 2. Record Data (No broad try/except)
         timestamp_unix = measurement['timestamp']
@@ -305,8 +309,7 @@ def gate_status():
 
 @app.route("/sps30")
 def sps30():
-    measurement = pm_sensor.get_measurement()
-    return measurement
+    return mqtt_client.last_measurement
 
 @app.route("/gatecmd/<gateid>/<gatecmd>")
 def gatecmd(gateid, gatecmd):

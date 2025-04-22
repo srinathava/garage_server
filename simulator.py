@@ -132,7 +132,7 @@ class Simulator:
                 heartbeat = {
                     "gatePos": gate.status,
                     "openPos": gate.open_pos,
-                    "closedPos": gate.close_pos
+                    "closePos": gate.close_pos
                 }
                 self.client.publish(f"/heartbeat/{gate_id}", json.dumps(heartbeat))
             

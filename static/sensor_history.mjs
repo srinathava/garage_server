@@ -9,7 +9,7 @@ export const DISPLAY_MODE = {
 };
 
 // Define thresholds for different sensor types
-const thresholds = {
+export const thresholds = {
     // Mass density thresholds (μg/m³)
     'mass_density.pm1.0': { green: 10, orange: 20, red: 35 },
     'mass_density.pm2.5': { green: 12, orange: 35, red: 55 },
@@ -28,7 +28,7 @@ const thresholds = {
 };
 
 // Function to get color based on value and thresholds
-function getColorForValue(sensorKey, value) {
+export function getColorForValue(sensorKey, value) {
     const sensorThresholds = thresholds[sensorKey] || thresholds.default;
     
     if (value <= sensorThresholds.green) {
@@ -301,7 +301,6 @@ async function fetchDataAndUpdateCharts(mode = DISPLAY_MODE.REGULAR, compactCont
     sensorKeys.forEach(key => {
         // Check if chart container exists, create if not
         if (!key.includes('mass_density') && mode == DISPLAY_MODE.COMPACT) {
-            console.log(`Skipping ${key} for compact mode`);
             return;
         }
         let chartDiv = document.getElementById(`chart-div-${key}`);
