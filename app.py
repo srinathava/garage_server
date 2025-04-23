@@ -10,6 +10,22 @@ import threading
 import os
 import sys
 import pandas as pd
+from datetime import datetime
+
+# Setup influxdb client for data storage
+from influxdb_client import InfluxDBClient, Point, WritePrecision
+from influxdb_client.client.write_api import SYNCHRONOUS
+
+# InfluxDB configuration
+INFLUX_URL = "http://localhost:8086"  # Host-side access
+INFLUX_TOKEN = "AirQualityToken"  # Token for authentication
+INFLUX_ORG = "Workshop"
+INFLUX_BUCKET = "AirQuality"
+
+# Initialize InfluxDB client
+client = InfluxDBClient(url=INFLUX_URL, token=INFLUX_TOKEN, org=INFLUX_ORG)
+write_api = client.write_api(write_options=SYNCHRONOUS)
+query_api = client.query_api()
 
 # Setup for GPIO control of dust collector remote
 import RPi.GPIO as GPIO
@@ -42,7 +58,7 @@ scheduler.init_app(app)
 scheduler.start()
 
 TOOL_SENSOR_IDS = ['tablesaw', 'jointer', 'bandsaw', 'sander', 'drillpress']
-GATE_MAX_KEEPALIVE = timedelta(minutes=1)
+GATE_MAX_KEEPALIVE = timedelta(seconds=15)
 
 GATES_FOR_TOOLS = {
     'tablesaw': ['6'],
@@ -264,6 +280,14 @@ class MqttClient:
             print("No metrics extracted from sensor data.")
             return # Exit if no data extracted
 
+        # Write to InfluxDB
+        point = Point("sensor_data").tag("sensor", "sps30").time(datetime.utcnow(), WritePrecision.NS)
+        for key, value in flat_data.items():
+            point.field(key, value)
+
+        write_api.write(bucket=INFLUX_BUCKET, record=point)
+        print(f"Wrote to InfluxDB: {point.to_line_protocol()}")
+
         # Create a single-row DataFrame with timestamp index
         new_row_df = pd.DataFrame(flat_data, index=[timestamp_dt])
 
@@ -282,11 +306,11 @@ class MqttClient:
 
 mqtt_client = MqttClient()
 
-@scheduler.task('interval', seconds=10)
+@scheduler.task('interval', seconds=1)
 def updateStatuses():
     mqtt_client.updateStatuses()
 
-@scheduler.task('interval', seconds=1, id='record_sensor_data_job')
+@scheduler.task('interval', seconds=5, id='record_sensor_data_job')
 def record_and_prune_sensor_data():
     """Scheduled task to read sensor, record data, and prune history."""
     mqtt_client.update_sensor_history()

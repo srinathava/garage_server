@@ -3,3 +3,4 @@ flask_apscheduler==1.13.1
 paho_mqtt==2.1.0
 
 pandas
+influxdb-client
