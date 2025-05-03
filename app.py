@@ -13,9 +13,30 @@ import pandas as pd
 from datetime import datetime
 import re
 
-# Disable excessive logging from Flask and Werkzeug
+# Setup logging
 import logging
+
+# Create a custom logger for app.py
+logger = logging.getLogger('app.py')
+logger.setLevel(logging.INFO)
+# Prevent logger from propagating messages to parent loggers (like Flask's root logger)
+logger.propagate = False
+
+# Create handler and set its properties
+handler = logging.StreamHandler()
+handler.setLevel(logging.INFO)
+formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+handler.setFormatter(formatter)
+
+# Add handler to logger
+logger.addHandler(handler)
+
+# Disable excessive logging from Flask and Werkzeug
 logging.getLogger('werkzeug').setLevel(logging.ERROR)
+
+def logMsg(message, level=logging.INFO):
+    """Centralized logging function for consistent log formatting"""
+    logger.log(level, message)
 
 # Setup influxdb client for data storage
 from influxdb_client import InfluxDBClient, Point, WritePrecision
@@ -48,11 +69,11 @@ sys.path.append(os.path.join(script_dir, 'sps30'))
 from sps30 import SPS30
 
 pm_sensor = SPS30()
-print(f"Firmware version: {pm_sensor.firmware_version()}")
-print(f"Product type: {pm_sensor.product_type()}")
-print(f"Serial number: {pm_sensor.serial_number()}")
-print(f"Status register: {pm_sensor.read_status_register()}")
-print(
+logMsg(f"Firmware version: {pm_sensor.firmware_version()}")
+logMsg(f"Product type: {pm_sensor.product_type()}")
+logMsg(f"Serial number: {pm_sensor.serial_number()}")
+logMsg(f"Status register: {pm_sensor.read_status_register()}")
+logMsg(
     f"Auto cleaning interval: {pm_sensor.read_auto_cleaning_interval()}s")
 pm_sensor.start_measurement()
 
@@ -104,7 +125,7 @@ class MqttClient:
         self.client.loop_start()
 
     def on_connect(self, *_):
-        print("Connected to MQTT broker")
+        logMsg("Connected to MQTT broker")
         self.client.subscribe("/gateack/#")
         self.client.subscribe("/gatecmd/#")
         self.client.subscribe("/heartbeat/#")
@@ -164,11 +185,11 @@ class MqttClient:
             isClosed = gate.status == "close"
 
             if shouldOpen and not isOpen:
-                print(f"{gateid} should be open but its not")
+                logMsg(f"{gateid} should be open but its not")
                 return False
             
             if not shouldOpen and not isClosed:
-                print(f"{gateid} should be closed but its not")
+                logMsg(f"{gateid} should be closed but its not")
                 return False
 
         return True
@@ -177,13 +198,13 @@ class MqttClient:
         return PAT_GATE.match(id) is not None
 
     def turnOnDustCollector(self):
-        print("Turning on dust collector")
+        logMsg("Turning on dust collector")
         GPIO.output(DC_ON_PIN, GPIO.HIGH)
         time.sleep(0.7)
         GPIO.output(DC_ON_PIN, GPIO.LOW)
 
     def turnOffDustCollector(self):
-        print("Turning off dust collector")
+        logMsg("Turning off dust collector")
         GPIO.output(DC_OFF_PIN, GPIO.HIGH)
         time.sleep(0.7)
         GPIO.output(DC_OFF_PIN, GPIO.LOW)
@@ -210,7 +231,7 @@ class MqttClient:
             if n > 20:
                 return
 
-        print("Telling coordinator to turn on DC")
+        logMsg("Telling coordinator to turn on DC")
         time.sleep(0.2)
         self.turnOnDustCollector()
 
@@ -224,9 +245,9 @@ class MqttClient:
                 self.gatecmd(gateid, "close")
 
     def onToolSensor(self, msg):
-        print("Getting tool sensor message")
+        logMsg("Getting tool sensor message")
         status = self.onStatusUpdate(msg)
-        print(f"Tool {status.id} was switched {status.status}")
+        logMsg(f"Tool {status.id} was switched {status.status}")
         if status.status == "on":
             record = (Point("tool_status")
                 .field("current_tool", status.id)
@@ -244,7 +265,7 @@ class MqttClient:
                 .time(datetime.utcnow(), WritePrecision.NS))
             write_api.write(bucket=TOOL_SENSOR_BUCKET, 
                             record=record)
-            print("Telling coordinator to turn off DC")
+            logMsg("Telling coordinator to turn off DC")
             self.turnOffDustCollector()
             
     def on_message(self, client, userdata, msg):
@@ -253,9 +274,9 @@ class MqttClient:
         elif msg.topic.startswith("/tool_sensor"):
             self.onToolSensor(msg)
         elif msg.topic.startswith("/gateack"):
-            print("Processing gate acknowledgement")
+            logMsg("Processing gate acknowledgement")
             status = self.onStatusUpdate(msg)
-            print(f"Gate {status.id} is {status.status}")
+            logMsg(f"Gate {status.id} is {status.status}")
         elif msg.topic.startswith("/coordinator_keypress"):
             self.onCoordinatorKeyPress(msg)
 
@@ -264,7 +285,7 @@ class MqttClient:
         # 1. Read Sensor
         measurement = pm_sensor.get_measurement()
         if not measurement:
-            print("Failed to get sensor measurement.")
+            logMsg("Failed to get sensor measurement.")
             return # Exit if no measurement
 
         self.last_measurement = measurement
@@ -285,7 +306,7 @@ class MqttClient:
             # Ignoring unit fields
 
         if not flat_data:
-            print("No metrics extracted from sensor data.")
+            logMsg("No metrics extracted from sensor data.")
             return # Exit if no data extracted
 
         # Write to InfluxDB
@@ -294,7 +315,7 @@ class MqttClient:
             point.field(key, value)
 
         write_api.write(bucket=AIR_QUALITY_BUCKET, record=point)
-        print(f"Wrote to InfluxDB: {point.to_line_protocol()}")
+        logMsg(f"Wrote to InfluxDB: {point.to_line_protocol()}", level=logging.DEBUG)
 
         # Create a single-row DataFrame with timestamp index
         new_row_df = pd.DataFrame(flat_data, index=[timestamp_dt])
@@ -309,7 +330,7 @@ class MqttClient:
 
 
     def gatecmd(self, gateid, gatecmd):
-        print(f"Publishing message /gatecmd/{gateid} {gatecmd}")
+        logMsg(f"Publishing message /gatecmd/{gateid} {gatecmd}")
         self.client.publish("/gatecmd/" + gateid, gatecmd)
 
 mqtt_client = MqttClient()
@@ -351,7 +372,7 @@ def gatecmd(gateid, gatecmd):
 @app.route("/open-manual-gate")
 def open_manual_gate():
     """Opens the manual gate and closes all others."""
-    print("Opening manual gate")
+    logMsg("Opening manual gate")
     mqtt_client.openManualGate()
     return "ok"
 
