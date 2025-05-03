@@ -1,5 +1,5 @@
 from flask import Flask, Response
-from flask import redirect
+from flask import redirect, request
 import paho.mqtt.client as mqtt
 from datetime import datetime, timedelta
 from flask_apscheduler import APScheduler
@@ -11,6 +11,11 @@ import os
 import sys
 import pandas as pd
 from datetime import datetime
+import re
+
+# Disable excessive logging from Flask and Werkzeug
+import logging
+logging.getLogger('werkzeug').setLevel(logging.ERROR)
 
 # Setup influxdb client for data storage
 from influxdb_client import InfluxDBClient, Point, WritePrecision
@@ -20,7 +25,8 @@ from influxdb_client.client.write_api import SYNCHRONOUS
 INFLUX_URL = "http://localhost:8086"  # Host-side access
 INFLUX_TOKEN = "AirQualityToken"  # Token for authentication
 INFLUX_ORG = "Workshop"
-INFLUX_BUCKET = "AirQuality"
+AIR_QUALITY_BUCKET = "AirQuality"
+TOOL_SENSOR_BUCKET = "ToolSensor"
 
 # Initialize InfluxDB client
 client = InfluxDBClient(url=INFLUX_URL, token=INFLUX_TOKEN, org=INFLUX_ORG)
@@ -65,9 +71,11 @@ GATES_FOR_TOOLS = {
     'jointer': ['5', '1'],
     'bandsaw': ['5', '4'],
     'sander': ['5', '7'],
-    'drillpress': ['5', '7']
+    'drillpress': ['5', '7'],
+    'router': ['10'],
 }
 GATE_FOR_MANUAL = '10'
+PAT_GATE = re.compile(r'^[0-9]+$')
 
 class Status:
     def __init__(self, id):
@@ -76,14 +84,6 @@ class Status:
         self.lastTickTime = datetime.min
         self.status = '?'
         self.json = None
-
-class GateStatus(Status):
-    def __init__(self, id):
-        super().__init__(id)
-
-class ToolSensorStatus(Status):
-    def __init__(self, id):
-        super().__init__(id)
 
 class MqttClient:
     def __init__(self):
@@ -94,10 +94,6 @@ class MqttClient:
         self.pendingFuture = None
 
         self.idToStatusMap = {}
-        for id in TOOL_SENSOR_IDS:
-            tool = ToolSensorStatus(id)
-            tool.status = 'off'
-            self.idToStatusMap[id] = tool
 
         # History for sensor data using Pandas DataFrame
         self.sensor_history_df = pd.DataFrame()
@@ -126,7 +122,7 @@ class MqttClient:
 
         status = self.idToStatusMap.get(gateid)
         if status is None:
-            status = GateStatus(gateid)
+            status = Status(gateid)
             self.idToStatusMap[gateid] = status
 
         status.alive = True
@@ -138,7 +134,7 @@ class MqttClient:
             return
 
         status.json = msgJson
-        if gateid not in TOOL_SENSOR_IDS:
+        if self.isGate(gateid):
             status.status = msgJson['gatePos']
             
     def updateStatuses(self):
@@ -178,14 +174,16 @@ class MqttClient:
         return True
 
     def isGate(self, id):
-        return id not in TOOL_SENSOR_IDS
+        return PAT_GATE.match(id) is not None
 
     def turnOnDustCollector(self):
+        print("Turning on dust collector")
         GPIO.output(DC_ON_PIN, GPIO.HIGH)
         time.sleep(0.7)
         GPIO.output(DC_ON_PIN, GPIO.LOW)
 
     def turnOffDustCollector(self):
+        print("Turning off dust collector")
         GPIO.output(DC_OFF_PIN, GPIO.HIGH)
         time.sleep(0.7)
         GPIO.output(DC_OFF_PIN, GPIO.LOW)
@@ -230,12 +228,22 @@ class MqttClient:
         status = self.onStatusUpdate(msg)
         print(f"Tool {status.id} was switched {status.status}")
         if status.status == "on":
+            record = (Point("tool_status")
+                .field("current_tool", status.id)
+                .time(datetime.utcnow(), WritePrecision.NS))
+            write_api.write(bucket=TOOL_SENSOR_BUCKET, 
+                            record=record)
             # We need to do this on a separate thread otherwise the MQTT thread
             # which processes incoming messages is blocked and we do not receive
             # the /gateack messages
             t = threading.Thread(target=self.switchToTool, args=(status.id,))
             t.start()
         else:
+            record = (Point("tool_status")
+                .field("current_tool", "")
+                .time(datetime.utcnow(), WritePrecision.NS))
+            write_api.write(bucket=TOOL_SENSOR_BUCKET, 
+                            record=record)
             print("Telling coordinator to turn off DC")
             self.turnOffDustCollector()
             
@@ -285,7 +293,7 @@ class MqttClient:
         for key, value in flat_data.items():
             point.field(key, value)
 
-        write_api.write(bucket=INFLUX_BUCKET, record=point)
+        write_api.write(bucket=AIR_QUALITY_BUCKET, record=point)
         print(f"Wrote to InfluxDB: {point.to_line_protocol()}")
 
         # Create a single-row DataFrame with timestamp index
@@ -358,6 +366,15 @@ def dust_collector(action):
         return "Invalid action", 400
     return "ok"
 
+# Route to handle blah.html and redirect to port 5000
+@app.route('/sensor_history_grafana')
+def redirect_to_blah():
+    URL = 'http://{HOSTNAME}:3000/public-dashboards/88a9ddfee8e54b3e8a13901e2cb5d5cb?refresh=5s&orgId=1'
+    host = request.host.split(':')[0]
+    redirect_url = URL.format(HOSTNAME=host)
+    # Perform the redirect
+    return redirect(redirect_url, code=302)
+
 @app.route("/sensor_history")
 def sensor_history():
     """Returns the 1-hour sensor data history as JSON."""
@@ -370,4 +387,4 @@ def sensor_history():
     return Response(json_data, mimetype='application/json')
 
 if __name__ == '__main__':
-    app.run()
+    app.run(debug=False)
